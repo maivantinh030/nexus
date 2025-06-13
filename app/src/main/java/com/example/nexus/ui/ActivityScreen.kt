@@ -1,19 +1,15 @@
+
+package com.example.nexus.ui.activity
+
+import android.os.Build
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,21 +17,11 @@ import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,80 +30,74 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.nexus.R
-import com.example.nexus.ui.activity.ActivityViewModel
+import com.example.nexus.ui.model.Notification
+import com.example.nexus.ui.model.Post
+import com.example.nexus.ui.model.User
 import com.example.nexus.ui.timeline.TimelineViewModel
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-fun parseTimeStringToTimestamp(timeString: String): Long {
-    return try {
-        // Kiểm tra định dạng của chuỗi thời gian
-        val format = if (timeString.contains(".")) {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-        } else {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
-        }
-
-        // Chuyển đổi chuỗi thành đối tượng Date và lấy timestamp
-        format.parse(timeString)?.time ?: System.currentTimeMillis()
-    } catch (e: Exception) {
-        // Trong trường hợp lỗi, trả về thời gian hiện tại
-        System.currentTimeMillis()
-    }
-}
-/**
- * Hàm tiện ích để tính thời gian tương đối
- * Ví dụ: "2 phút trước", "3 giờ trước", "5 ngày trước"
- */
-fun getRelativeTimeSpan(timeString: String): String {
-    val timestamp = parseTimeStringToTimestamp(timeString)
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
-
-    return when {
-        diff < TimeUnit.MINUTES.toMillis(1) -> "vừa xong"
-        diff < TimeUnit.HOURS.toMillis(1) -> {
-            val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
-            "$minutes phút trước"
-        }
-        diff < TimeUnit.DAYS.toMillis(1) -> {
-            val hours = TimeUnit.MILLISECONDS.toHours(diff)
-            "$hours giờ trước"
-        }
-        diff < TimeUnit.DAYS.toMillis(7) -> {
-            val days = TimeUnit.MILLISECONDS.toDays(diff)
-            "$days ngày trước"
-        }
-        diff < TimeUnit.DAYS.toMillis(30) -> {
-            val weeks = TimeUnit.MILLISECONDS.toDays(diff) / 7
-            "$weeks tuần trước"
-        }
-        else -> {
-            val months = TimeUnit.MILLISECONDS.toDays(diff) / 30
-            if (months < 12) {
-                "$months tháng trước"
-            } else {
-                val years = months / 12
-                "$years năm trước"
-            }
-        }
-    }
-}
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun ActivityScreen(
     activityViewModel: ActivityViewModel,
     timelineViewModel: TimelineViewModel,
     navController: NavController? = null
 ) {
-    val notifications by activityViewModel.notifications.collectAsState()
+    val notificationState by activityViewModel.notificationState.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+
+    // Hiển thị lỗi qua Snackbar
+    LaunchedEffect(notificationState.error) {
+        notificationState.error?.let {
+            scope.launch {
+                snackbarHostState.showSnackbar(it)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        scope.launch {
+            val token = timelineViewModel.getAccessToken()
+            if (token != null) {
+                activityViewModel.fetchNotifications(page = 0) // Lấy thông báo
+//                activityViewModel.fetchUnreadNotifications(page = 0) // Lấy thông báo chưa đọc
+            } else {
+                snackbarHostState.showSnackbar("Vui lòng đăng nhập để xem thông báo")
+            }
+        }
+    }
+    // Kích hoạt loadMoreNotifications khi cuộn đến gần cuối
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo }
+            .collect { layoutInfo ->
+                val totalItems = layoutInfo.totalItemsCount
+                val visibleItems = layoutInfo.visibleItemsInfo
+                if (visibleItems.isNotEmpty() && totalItems > 0) {
+                    val lastVisibleItem = visibleItems.last().index
+                    if (lastVisibleItem >= totalItems - 3 && !notificationState.loadingMore && !notificationState.last) {
+                        scope.launch {
+                            val userId = timelineViewModel.currentUserId
+                            if (userId != null) {
+                                activityViewModel.loadMoreNotifications() // Cập nhật để truyền userId
+                            }
+                        }
+                    }
+                }
+            }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        SnackbarHost(hostState = snackbarHostState)
         Text(
             text = "Notifications",
             style = MaterialTheme.typography.headlineMedium,
@@ -125,72 +105,111 @@ fun ActivityScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        if (notifications.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 32.dp)
-                    .wrapContentSize(Alignment.Center)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "No notifications",
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No notifications yet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
+        when {
+            notificationState.loading && notificationState.notifications.isEmpty() -> {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentSize(Alignment.Center)
+                )
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(notifications) { notification ->
-                    NotificationCard(
-                        notification = notification,
-                        timelineViewModel = timelineViewModel,
-                        activityViewModel = activityViewModel,
-                        navController = navController,
-                        context = context
+            notificationState.error != null -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentSize(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Error: ${notificationState.error}",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+//                    Button(onClick = { activityViewModel.fetchNotifications(page = 0) }) {
+//                        Text("Try Again")
+//                    }
+                }
+            }
+            else -> {
+                LazyColumn(state = listState) {
+                    items(notificationState.notifications) { notification ->
+                        NotificationCard(
+                            notification = notification,
+                            timelineViewModel = timelineViewModel,
+                            activityViewModel = activityViewModel,
+                            navController = navController,
+                            context = context
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (notificationState.loadingMore) {
+                        item {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                                    .wrapContentSize(Alignment.Center)
+                            )
+                        }
+                    }
+                    if (notificationState.last && notificationState.notifications.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "Đã hết thông báo",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                    if (notificationState.notifications.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp)
+                                    .wrapContentSize(Alignment.Center)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "No notifications",
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "No notifications yet",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun NotificationCard(
-    notification: ActivityViewModel.Notification,
+    notification: Notification,
     timelineViewModel: TimelineViewModel,
     activityViewModel: ActivityViewModel,
     navController: NavController?,
     context: android.content.Context
 ) {
-    // Collect posts state
-    val posts by timelineViewModel.posts.collectAsState()
+    val scope = rememberCoroutineScope()
 
-    // Tìm thông tin người thực hiện hành động (actor)
-    val actor = remember(posts) {
-        posts
-            .mapNotNull { it.user }
-            .distinctBy { it.id }
-            .find { it.id == notification.actor_id }
-    }
+    val actorName = notification.actorFullName.ifEmpty { notification.actorUsername }
+    val actorProfilePicture = notification.actorProfilePicture
 
-    // Tìm thông tin bài đăng (nếu có)
-    val post = remember(posts) {
-        posts.find { it.id == notification.target_id }
-    }
-
-    // Quyết định icon và màu sắc dựa trên loại thông báo
     val (icon, backgroundColor) = when (notification.type) {
         "LIKE_POST", "LIKE_COMMENT" -> Pair(
             Icons.Default.Favorite,
@@ -214,42 +233,53 @@ fun NotificationCard(
         )
     }
 
-    // Tính thời gian tương đối (truyền timestamp từ notification vào đây)
-    val relativeTime = remember {
-        // Giả sử notification.timestamp là thời gian tính bằng milliseconds
-        getRelativeTimeSpan(notification.created_at)
+    val relativeTime = remember(notification.createdAt) {
+        try {
+            val instant = Instant.parse(notification.createdAt)
+            val now = Instant.now()
+            val diff = now.toEpochMilli() - instant.toEpochMilli()
+            when {
+                diff < 60_000 -> "vừa xong"
+                diff < 3_600_000 -> "${diff / 60_000} phút trước"
+                diff < 86_400_000 -> "${diff / 3_600_000} giờ trước"
+                diff < 604_800_000 -> "${diff / 86_400_000} ngày trước"
+                diff < 2_592_000_000 -> "${diff / 604_800_000} tuần trước"
+                else -> {
+                    val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy")
+                        .withZone(ZoneId.systemDefault())
+                    formatter.format(instant)
+                }
+            }
+        } catch (e: Exception) {
+            "Unknown time"
+        }
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                // Đánh dấu thông báo là đã đọc
-                activityViewModel.markAsRead(notification.notification_id)
-
-                // Điều hướng dựa trên loại thông báo
+                activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
                 when (notification.type) {
                     "LIKE_POST", "COMMENT" -> {
-                        if (notification.target_id != null) {
-                            navController?.navigate("post_detail/${notification.target_id}") ?: run {
+                        if (notification.targetId != null) {
+                            navController?.navigate("post_detail/${notification.targetId}") ?: run {
                                 Toast.makeText(context, "Cannot navigate to post details", Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
                     "FOLLOW" -> {
-                        if (notification.actor_id != null) {
-                            navController?.navigate("profile/${notification.actor_id}") ?: run {
-                                Toast.makeText(context, "Cannot navigate to profile", Toast.LENGTH_SHORT).show()
-                            }
+                        navController?.navigate("profile/${notification.actorId}") ?: run {
+                            Toast.makeText(context, "Cannot navigate to profile", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
             },
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (!notification.is_read) 4.dp else 1.dp
+            defaultElevation = if (!notification.isRead) 4.dp else 1.dp
         ),
         colors = CardDefaults.cardColors(
-            containerColor = if (!notification.is_read)
+            containerColor = if (!notification.isRead)
                 MaterialTheme.colorScheme.surface
             else
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
@@ -261,7 +291,6 @@ fun NotificationCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon thông báo
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -272,7 +301,7 @@ fun NotificationCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = "Notification Type",
-                    tint = when(notification.type) {
+                    tint = when (notification.type) {
                         "LIKE_POST", "LIKE_COMMENT" -> MaterialTheme.colorScheme.primary
                         "FOLLOW" -> MaterialTheme.colorScheme.secondary
                         else -> MaterialTheme.colorScheme.tertiary
@@ -283,35 +312,28 @@ fun NotificationCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Nội dung thông báo
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                // Avatar người gửi thông báo và tên
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (actor != null) {
-                        AsyncImage(
-                            model = actor.profile_picture ?: R.drawable.ic_avatar_placeholder,
-                            contentDescription = "User avatar",
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape),
-                            error = androidx.compose.ui.res.painterResource(id = R.drawable.ic_avatar_placeholder),
-                            placeholder = androidx.compose.ui.res.painterResource(id = R.drawable.ic_avatar_placeholder)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
+                    AsyncImage(
+                        model = actorProfilePicture ?: R.drawable.ic_avatar_placeholder,
+                        contentDescription = "User avatar",
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = actor?.username ?: "Someone",
+                        text = actorName,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // Hiển thị thời gian tương đối
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "• $relativeTime",
@@ -322,49 +344,21 @@ fun NotificationCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Nội dung thông báo
+                // Sử dụng message từ backend thay vì hardcode
                 Text(
-                    text = when (notification.type) {
-                        "LIKE_POST" -> "liked your post"
-                        "LIKE_COMMENT" -> "liked your comment"
-                        "COMMENT" -> "commented on your post"
-                        "REPLY_POST" -> "replied to your post"
-                        "FOLLOW" -> "followed you"
-                        "MENTION_POST" -> "mentioned you in a post"
-                        "MENTION_COMMENT" -> "mentioned you in a comment"
-                        "REPOST" -> "reposted your post"
-                        else -> "sent you a notification"
-                    },
+                    text = notification.message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
-                // Nếu có nội dung bài đăng thì hiển thị
-                if (post != null && notification.type in listOf("LIKE_POST", "COMMENT", "MENTION_POST", "REPOST")) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "\"${post.content.take(50)}${if (post.content.length > 50) "..." else ""}\"",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
 
-            // Nút Follow Back (nếu là thông báo Follow)
-            if (notification.type == "FOLLOW" && !notification.is_read) {
+            if (notification.type == "FOLLOW" && !notification.isRead) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = {
-                        val actorId = notification.actor_id
-                        if (actorId != null) {
-                            timelineViewModel.followUser(actorId, activityViewModel)
-                            activityViewModel.markAsRead(notification.notification_id)
-                            Toast.makeText(context, "Followed back", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "Cannot follow back this user", Toast.LENGTH_SHORT).show()
-                        }
+                        timelineViewModel.followUser(notification.actorId, activityViewModel)
+                        activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
+                        Toast.makeText(context, "Followed back", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.height(36.dp),
                     shape = RoundedCornerShape(18.dp)
@@ -375,4 +369,3 @@ fun NotificationCard(
         }
     }
 }
-

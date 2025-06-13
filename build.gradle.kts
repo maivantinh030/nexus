@@ -12,7 +12,7 @@ buildscript {
     }
     dependencies {
         // Cập nhật phiên bản Android Gradle plugin lên 8.6.0 hoặc phiên bản cao hơn
-        classpath("com.android.tools.build:gradle:8.6.0")
+        classpath("com.android.tools.build:gradle:8.9.1")
 
         // Đảm bảo bạn sử dụng phiên bản Kotlin mới nhất tương thích
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.20")

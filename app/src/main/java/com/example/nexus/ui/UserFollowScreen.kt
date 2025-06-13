@@ -24,6 +24,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -46,6 +47,10 @@ import com.example.nexus.R
 import com.example.nexus.ui.activity.ActivityViewModel
 import com.example.nexus.ui.model.User
 import com.example.nexus.ui.timeline.TimelineViewModel
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun UserFollowScreen(
@@ -55,23 +60,17 @@ fun UserFollowScreen(
     navController: NavController,
     selectedTab: Int = 0
 ){
-    val posts by timelineViewModel.posts.collectAsState()
-    val follows by timelineViewModel.follows.collectAsState()
-    val followers = remember(follows,posts){
-        val followerIds = follows
-            .filter { it.second == userId  }
-            .map { it.first }
-        posts.mapNotNull { it.user }
-            .distinctBy { it.id }
-            .filter { it.id in followerIds}
-    }
-    val following = remember(follows,posts){
-        val followerIds = follows
-            .filter { it.first == userId  }
-            .map { it.second }
-        posts.mapNotNull { it.user }
-            .distinctBy { it.id }
-            .filter { it.id in followerIds}
+    val scope = rememberCoroutineScope()
+    var followers by remember { mutableStateOf<List<User>>(emptyList()) }
+    var following by remember { mutableStateOf<List<User>>(emptyList()) }
+    var user: User? by remember { mutableStateOf(null) }
+
+    LaunchedEffect(userId) {
+        scope.launch {
+            followers =  timelineViewModel.getFollowers(userId)
+            following = timelineViewModel.getFollowing(userId)
+            user = timelineViewModel.getUserById(userId = userId)
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()
@@ -158,10 +157,10 @@ fun UserItem(
     activityViewModel: ActivityViewModel,
     navController: NavController
 ){
-    val follows = timelineViewModel.follows.collectAsState()
+    val follows by timelineViewModel.follows.collectAsState()
     val currentUserId = 1L
-    val isFollowing by remember(follows) {
-        derivedStateOf { timelineViewModel.isFollowing(currentUserId,user.id ?: -1) }
+    val isFollowing = remember(follows) {
+        timelineViewModel.isFollowing(currentUserId, user.id ?: -1)
     }
     val context = LocalContext.current
     Card(
@@ -184,7 +183,7 @@ fun UserItem(
             verticalAlignment = Alignment.CenterVertically
         ){
             AsyncImage(
-                model = user.profile_picture?: R.drawable.ic_avatar_placeholder,
+                model = user.profilePicture?: R.drawable.ic_avatar_placeholder,
                 contentDescription = "User avatar",
                 modifier = Modifier
                     .size(40.dp)

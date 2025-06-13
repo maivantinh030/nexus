@@ -75,7 +75,7 @@ fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineView
                 )
             }
             Text(
-                text = "New Thread",
+                text = "New Post",
                 style = MaterialTheme.typography.headlineSmall
             )
             Spacer(modifier = Modifier.width(48.dp)) // Cân đối với IconButton

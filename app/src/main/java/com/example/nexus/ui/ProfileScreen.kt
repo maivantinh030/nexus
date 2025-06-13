@@ -1,9 +1,9 @@
 package com.example.nexus.ui
 
-import android.R.attr.fontWeight
 import android.os.Build
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -33,10 +35,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +62,7 @@ import com.example.nexus.ui.activity.ActivityViewModel
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
 import com.example.nexus.ui.timeline.TimelineViewModel
-import java.nio.file.WatchEvent
+import kotlinx.coroutines.launch
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -68,39 +72,29 @@ fun ProfileScreen(
     activityViewModel: ActivityViewModel? = null,
     navController: NavController? = null
 ) {
-    val posts by timelineViewModel.posts.collectAsState()
+    val scope = rememberCoroutineScope()
+    var followers by remember { mutableStateOf<List<User>>(emptyList()) }
+    var following by remember { mutableStateOf<List<User>>(emptyList()) }
+    var user: User? by remember { mutableStateOf(null) }
+//    val posts by timelineViewModel.postsState.value.posts
     val follows by timelineViewModel.follows.collectAsState()
     val context = LocalContext.current
 
-    val followers = remember(follows,posts){
-        val followerIds = follows
-            .filter { it.second == userId  }
-            .map { it.first }
-        posts.mapNotNull { it.user }
-            .distinctBy { it.id }
-            .filter { it.id in followerIds}
-    }
-    val following = remember(follows,posts){
-        val followerIds = follows
-            .filter { it.first == userId  }
-            .map { it.second }
-        posts.mapNotNull { it.user }
-            .distinctBy { it.id }
-            .filter { it.id in followerIds}
+    LaunchedEffect(userId) {
+        scope.launch {
+            followers =  timelineViewModel.getFollowers(userId)
+            following = timelineViewModel.getFollowing(userId)
+            user = timelineViewModel.getUserById(userId = userId)
+        }
     }
     // Tìm người dùng dựa trên userId (sử dụng posts đã thu thập)
-    val user = remember(posts) {
-        posts.mapNotNull { it.user }
-            .distinctBy { it.id }
-            .find { it.id == userId }
-    }
 
     val currentUserId = timelineViewModel.currentUserId
     val isOwnProfile = userId == currentUserId
     // Kiểm tra trạng thái theo dõi
     val isFollowing = remember(follows, userId, currentUserId) {
         if (!isOwnProfile) {
-            timelineViewModel.isFollowing(currentUserId,userId)
+            timelineViewModel.isFollowing(currentUserId?: 0,userId)
         } else {
             false // Giá trị mặc định khi xem profile của chính mình (không quan trọng)
         }
@@ -111,12 +105,14 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
-                    model = profileUser.profile_picture ?: R.drawable.ic_avatar_placeholder,
+                    model = profileUser.profilePicture ?: R.drawable.ic_avatar_placeholder,
                     contentDescription = "Profile picture",
                     modifier = Modifier
                         .size(80.dp)
@@ -126,13 +122,29 @@ fun ProfileScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = profileUser.username,
-                        style = MaterialTheme.typography.headlineSmall.copy(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ){
+                        Text(
+                            text = profileUser.username ?: "Unknown User",
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
                         )
-                    )
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (isOwnProfile) {
+                            IconButton(onClick = {
+                                navController?.navigate("settings")
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Settings",
+                                    tint = Color.Black
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(){
                         TextButton(onClick = {
@@ -167,62 +179,92 @@ fun ProfileScreen(
                 }
 
 
+
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    if (isFollowing) {
-                        timelineViewModel.unfollowUser(userId)
-                        Toast.makeText(context, "Unfollowed ${profileUser.username}", Toast.LENGTH_SHORT).show()
-                    } else {
-                        // Kiểm tra null cho activityViewModel
-                        activityViewModel?.let { actVM ->
-                            timelineViewModel.followUser(userId, actVM)
-                            Toast.makeText(context, "Followed ${profileUser.username}", Toast.LENGTH_SHORT).show()
-                        } ?: run {
-                            Toast.makeText(context, "Cannot follow user at this time", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (isFollowing) "Unfollow" else "Follow")
-            }
+            if (isOwnProfile) {
+                // Own profile: Settings and Edit Profile buttons
 
-            Button(
-                onClick = {
-                    Toast.makeText(context, "Edit Profile clicked", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Edit Profile")
+
+                    Button(
+                        onClick = {
+                            Toast.makeText(context, "Edit Profile clicked", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Edit Profile")
+                    }
+
+            } else {
+                // Other user's profile: Follow/Unfollow button
+                Button(
+                    onClick = {
+                        if (isFollowing) {
+                            timelineViewModel.unfollowUser(userId)
+                            Toast.makeText(context, "Unfollowed ${profileUser.username}", Toast.LENGTH_SHORT).show()
+                        } else {
+                            activityViewModel?.let { actVM ->
+                                timelineViewModel.followUser(userId, actVM)
+                                Toast.makeText(context, "Followed ${profileUser.username}", Toast.LENGTH_SHORT).show()
+                            } ?: run {
+                                Toast.makeText(context, "Cannot follow user at this time", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(30.dp) // Ensure consistent height
+                        .then(
+                            if (isFollowing) {
+                                Modifier.border(
+                                    width = 1.dp,
+                                    color = Color.Black,
+                                    shape = RoundedCornerShape(30.dp)
+                                )
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    shape = RoundedCornerShape(30.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isFollowing) MaterialTheme.colorScheme.surface else Color.Black,
+                        contentColor = if (isFollowing) MaterialTheme.colorScheme.onSurface else Color.White
+                    )
+
+                ) {
+                    Text(if (isFollowing) "Unfollow" else "Follow")
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
 
             // Hiển thị danh sách bài đăng của người dùng
-            val userPosts = remember(posts) {
-                posts.filter { it.user?.id == userId }
-            }
-
-            if (userPosts.isEmpty()) {
-                Text(
-                    text = "No posts yet",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentSize(Alignment.Center),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            } else {
-                LazyColumn {
-                    items(userPosts) { post ->
-                        PostItem(
-                            post = post,
-                            viewModel = timelineViewModel,
-                            navController = navController
-                        )
-                    }
-                }
-            }
+//            val userPosts = remember(posts) {
+//                posts.filter { it.user?.id == userId }
+//            }
+//
+//            if (userPosts.isEmpty()) {
+//                Text(
+//                    text = "No posts yet",
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .wrapContentSize(Alignment.Center),
+//                    style = MaterialTheme.typography.bodyLarge
+//                )
+//            } else {
+//                LazyColumn {
+//                    items(userPosts) { post ->
+//                        PostItem(
+//                            post = post,
+//                            viewModel = timelineViewModel,
+//                            navController = navController
+//                        )
+//                    }
+//                }
+//            }
         }
     } ?: run {
         Text(
@@ -235,37 +277,6 @@ fun ProfileScreen(
     }
 }
 
-//@RequiresApi(Build.VERSION_CODES.O)
-//@Preview(showBackground = true)
-//@Composable
-//fun ProfileScreenPreview() {
-//    val mockPosts = listOf(
-//        Post(
-//            id = 1,
-//            user = User(id = 1, username = "user1", bio = "Hello!", profile_picture = "https://example.com/avatar.jpg"),
-//            content = "This is my first post!",
-//            created_at = "2025-05-13T14:55:00Z",
-//            updated_at = "2025-05-13T14:55:00Z"
-//        ),
-//        Post(
-//            id = 2,
-//            user = User(id = 1, username = "user1", bio = "Hello!", profile_picture = "https://example.com/avatar.jpg"),
-//            content = "Another post!",
-//            created_at = "2025-05-13T14:55:00Z",
-//            updated_at = "2025-05-13T14:55:00Z"
-//        )
-//    )
-//
-//    val timelineViewModel = TimelineViewModel().apply {
-//        // Sử dụng cách an toàn hơn để khởi tạo dữ liệu giả mạo cho preview
-//        updatePosts(mockPosts)
-//    }
-//
-//    ProfileScreen(
-//        userId = 1,
-//        timelineViewModel = timelineViewModel
-//    )
-//}
 
 @Composable
 fun SettingScreen(
@@ -512,13 +523,13 @@ private fun isFormValid(currentPassword: String, newPassword: String, confirmPas
             newPassword == confirmPassword
 }
 
-@Preview(showBackground = true)
-@Composable
-fun ChangePasswordPreview() {
-    MaterialTheme {
-        ChangePassword(
-            viewModel = TimelineViewModel(),
-            navController = NavController(LocalContext.current)
-        )
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun ChangePasswordPreview() {
+//    MaterialTheme {
+//        ChangePassword(
+//            viewModel = TimelineViewModel(),
+//            navController = NavController(LocalContext.current)
+//        )
+//    }
+//}

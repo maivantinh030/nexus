@@ -4,12 +4,18 @@ data class User(
     val id: Long? = null,
     val username: String = "",
     val email: String = "",
-    val password_hash: String = "",
-    val full_name: String? = null,
+    val passwordHash: String = "",
+    val fullName: String? = null,
     val bio: String? = null,
-    val profile_picture: String? = null,
-    val is_verified: Boolean = false,
+    val profilePicture: String? = null,
+    val isVerified: Boolean = false,
     val status: String = "ACTIVE", // "ACTIVE", "SUSPENDED", "DELETED", "PENDING_VERIFICATION"
-    val created_at: String? = null,
-    val updated_at: String? = null
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+)
+data class UserResponse(
+    val status: Int,
+    val success: Boolean,
+    val message: String? = null,
+    val data: User
 )

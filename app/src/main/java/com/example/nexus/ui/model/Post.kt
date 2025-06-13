@@ -3,31 +3,59 @@ package com.example.nexus.ui.model
 data class Post(
     val id: Long? = null,
     val user: User? = null,
-    val parent_post_id: Long? = null,
+    val parentPostId: Long? = null,
     val content: String = "",
     val visibility: String = "PUBLIC", // "PUBLIC", "FOLLOWERS_ONLY", "PRIVATE"
-    val post_type: String = "TEXT", // "TEXT", "RESOURCE"
-    val like_count: Int = 0, // Đổi tên từ likesCount để đồng bộ với database
-    val comment_count: Int = 0,
-    val repost_count: Int = 0,
-    val quote_count: Int = 0,
-    val isLiked: Boolean = false, // Không có trong database, dùng để mô phỏng trạng thái Like
-    val comments: List<Comment> = emptyList(),
+    val postType: String = "TEXT", // "TEXT", "RESOURCE"
+    var likeCount: Long? = 0, // Đổi tên từ likesCount để đồng bộ với database
+    val commentCount: Int = 0,
+    val repostCount: Int = 0,
+    val quoteCount: Int = 0,
+    var isLiked: Boolean = false, // Không có trong database, dùng để mô phỏng trạng thái Like
+//    val comments: List<Comment> = emptyList(),
     val replies: List<Post> = emptyList(),
-    val imageUri: String? = null, // Tạm giữ để mô phỏng Media
-    val created_at: String? = null, // Lưu dạng String vì API thường trả về định dạng ISO
-    val updated_at: String? = null
+    val media: List<Media>? = null,
+    val createdAt: String? = null, // Lưu dạng String vì API thường trả về định dạng ISO
+    val updatedAt: String? = null
 )
 
-data class Comment(
-    val id: Long? = null,
-    val post_id: Long? = null,
-    val user: User? = null,
-    val parent_comment_id: Long? = null,
-    val content: String = "",
-    val like_count: Int = 0, // Đổi tên từ likesCount để đồng bộ với database
-    val isLiked: Boolean = false, // Không có trong database, dùng để mô phỏng trạng thái Like
-    val replies: List<Comment> = emptyList(),
-    val created_at: String? = null,
-    val updated_at: String? = null
+data class Media(
+    val id: Long?= null,
+    val mediaUrl: String = "",
+    val mediaType : String = "", // "IMAGE", "VIDEO", "AUDIO"
+    val sortOrder: Int = 0, // Thứ tự hiển thị trong bài đăng
+    val createdAt: String? = null
+)
+
+data class PostResponse(
+    val status: Int,
+    val success: Boolean,
+    val message: String? = null,
+    val data: PostData
+)
+
+data class PostData(
+    val content: List<Post>,
+    val totalElements: Long,
+    val totalPages: Int,
+    val last: Boolean,
+    val size: Int,
+    val number: Int,
+    val sort: Sort,
+    val numberOfElements: Int,
+    val first: Boolean,
+    val empty: Boolean
+)
+
+//data class Sort(
+//    val sorted: Boolean,
+//    val unsorted: Boolean,
+//    val empty: Boolean
+//)
+
+data class PostResponseSingle(
+    val status: Int,
+    val success: Boolean,
+    val message: String? = null,
+    val data: Post
 )

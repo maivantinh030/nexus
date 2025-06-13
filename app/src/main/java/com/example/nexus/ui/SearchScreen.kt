@@ -42,16 +42,16 @@ fun SearchScreen(
     timelineViewModel: TimelineViewModel,
     navController: NavController? = null
 ) {
-    val searchQuery by searchViewModel.searchQuery.collectAsState()
-    val searchResults by searchViewModel.searchResults.collectAsState()
+//    val searchQuery by searchViewModel.searchQuery.collectAsState()
+//    val searchResults by searchViewModel.searchResults.collectAsState()
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = {searchViewModel.updateSearchQuery(it)},
+            value = "",
+            onValueChange = {},
             label = {Text("Search users or posts...")},
             modifier = Modifier
                 .fillMaxWidth()
@@ -59,31 +59,31 @@ fun SearchScreen(
             textStyle = MaterialTheme.typography.bodyMedium
         )
         // Danh sách kết quả
-        if (searchResults.isEmpty() && searchQuery.isNotBlank()) {
-            Text(
-                text = "No results found",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentSize(Alignment.Center),
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-        else{
-            LazyColumn {
-                items(searchResults) { result ->
-                    when (result) {
-                        is SearchResult.UserResult -> UserSearchItem(
-                            user = result.user,
-                            onClick = { navController?.navigate("profile/${result.user.id}") }
-                        )
-                        is SearchResult.PostResult -> PostSearchItem(
-                            post = result.post,
-                            onClick = { navController?.navigate("post_detail/${result.post.id}") }
-                        )
-                    }
-                }
-            }
-        }
+//        if (searchResults.isEmpty() && searchQuery.isNotBlank()) {
+//            Text(
+//                text = "No results found",
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .wrapContentSize(Alignment.Center),
+//                style = MaterialTheme.typography.bodyLarge
+//            )
+//        }
+//        else{
+//            LazyColumn {
+//                items(searchResults) { result ->
+//                    when (result) {
+//                        is SearchResult.UserResult -> UserSearchItem(
+//                            user = result.user,
+//                            onClick = { navController?.navigate("profile/${result.user.id}") }
+//                        )
+//                        is SearchResult.PostResult -> PostSearchItem(
+//                            post = result.post,
+//                            onClick = { navController?.navigate("post_detail/${result.post.id}") }
+//                        )
+//                    }
+//                }
+//            }
+//        }
     }
 }
 
@@ -155,10 +155,10 @@ fun PostSearchItem(post: Post, onClick: () -> Unit) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun SearchScreenPreview() {
-    val timelineViewModel = TimelineViewModel()
-    val searchViewModel = SearchViewModel(timelineViewModel)
-    SearchScreen(searchViewModel, timelineViewModel)
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun SearchScreenPreview() {
+//    val timelineViewModel = TimelineViewModel()
+//    val searchViewModel = SearchViewModel(timelineViewModel)
+//    SearchScreen(searchViewModel, timelineViewModel)
+//}
