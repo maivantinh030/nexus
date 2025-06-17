@@ -1,22 +1,41 @@
 package com.example.nexus.ui.timeline
 
+import android.content.Context
+import android.net.Uri
+import android.os.Build
+import androidx.annotation.OptIn
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.util.Log
+import androidx.media3.common.util.UnstableApi
 import com.example.nexus.network.AuthManager
 import com.example.nexus.network.RetrofitClient
 import com.example.nexus.ui.activity.ActivityViewModel
 import com.example.nexus.ui.model.Comment
 import com.example.nexus.ui.model.CreateCommentRequest
+import com.example.nexus.ui.model.CreatePostRequest
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
+import com.example.nexus.utils.FileUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
-class TimelineViewModel(private val authManager: AuthManager) : ViewModel() {
+class TimelineViewModel(private val authManager: AuthManager,private val context: Context) : ViewModel() {
 
     private val _postsState = mutableStateOf(PostState())
     val postsState: State<PostState> = _postsState
@@ -28,6 +47,9 @@ class TimelineViewModel(private val authManager: AuthManager) : ViewModel() {
     val userCache: StateFlow<Map<Long, User>> = _userCache.asStateFlow()
     private val _postCache = MutableStateFlow<Map<Long, Post>>(emptyMap())
     val postCache: StateFlow<Map<Long, Post>> = _postCache.asStateFlow()
+    val activityViewModel = ActivityViewModel()
+    @RequiresApi(Build.VERSION_CODES.O)
+    val currentTime = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
     init {
         // Lấy dữ liệu bài đăng từ API khi ViewModel được khởi tạo
         fetchPosts()
@@ -278,7 +300,7 @@ class TimelineViewModel(private val authManager: AuthManager) : ViewModel() {
         }
 
     // Theo dõi một người dùng
-    fun followUser(userId: Long, activityViewModel: ActivityViewModel) {
+    fun followUser(userId: Long) {
         currentUserId?.let { currentId ->
             if (!isFollowing(currentId, userId)) {
                 _follows.value = _follows.value + Pair(currentId, userId)
@@ -288,8 +310,7 @@ class TimelineViewModel(private val authManager: AuthManager) : ViewModel() {
                     type = "FOLLOW",
                     targetType = "USER",
                     targetId = userId,
-                    targetOwnerId = userId,
-                    createdAt = "2025-05-13T14:55:00Z"
+                    targetOwnerId = userId
                 )
             }
         }
@@ -313,6 +334,15 @@ class TimelineViewModel(private val authManager: AuthManager) : ViewModel() {
                         _postCache.value = _postCache.value + (postId to p)
                     }
                     _currentPost.value = _currentPost.value?.copy(isLiked = true, likeCount = (_currentPost.value!!.likeCount?.plus(1)))
+                    activityViewModel.addNotification(
+                        userId = _postCache.value[postId]?.user?.id ?: 0,
+                        actorId = currentUserId ?: 0,
+                        type = "LIKE_POST",
+                        targetType = "POST",
+                        targetId = postId,
+                        targetOwnerId = _postCache.value[postId]?.user?.id ?: 0
+                    )
+
                 }
                 else{
                     _postsState.value = _postsState.value.copy(error = response.message ?: "Failed to like post")
@@ -379,46 +409,75 @@ class TimelineViewModel(private val authManager: AuthManager) : ViewModel() {
         }
     }
     // Thêm bài đăng mới
-    fun addPost(content: String, visibility: String = "PUBLIC", postType: Int? = null) {
-//        viewModelScope.launch {
-//            try {
-//                val request = CreatePostRequest(
-//                    content = content,
-//                    visibility = visibility,
-//                    postType = postType
-//                )
-//                val response = RetrofitClient.apiService.createPost(request)
-//                if (response.success) {
-//                    val newPost = response.data.copy(
-//                        id = (_postsState.value.posts.maxOfOrNull { it.id ?: 0 } ?: 0) + 1,
-//                        user = currentUser,
-//                        createdAt = "2025-05-13T14:55:00Z",
-//                        updatedAt = "2025-05-13T14:55:00Z",
-//                        isLiked = false, // Mặc định là chưa được like
-//                        likeCount = 0, // Mặc định là 0 likes
-//                        commentCount = 0, // Mặc định là 0 comments
-//                        repostCount = 0, // Mặc định là 0 reposts
-//                        quoteCount = 0 // Mặc định là 0 quotes
-//                    )
-//                    _postsState.value = _postsState.value.copy(
-//                        posts = listOf(newPost) + _postsState.value.posts,
-//                        loading = false,
-//                        error = null
-//                    )
-//                } else {
-//                    _postsState.value = _postsState.value.copy(
-//                        loading = false,
-//                        error = response.message ?: "Failed to add post"
-//                    )
-//                }
-//            } catch (e: Exception) {
-//                _postsState.value = _postsState.value.copy(
-//                    loading = false,
-//                    error = e.message ?: "Unknown error"
-//                )
-//            }
-//        }
-    }
+    @OptIn(UnstableApi::class)
+    @RequiresApi(Build.VERSION_CODES.O)
+        fun addPost(
+        content: String,
+        visibility: String = "PUBLIC",
+        parentPostId: Long? = null,
+        imageUris: List<Uri>
+    ) {
+            viewModelScope.launch {
+                try {
+                    if(imageUris.isEmpty()){
+                        val fileParts = mutableListOf<MultipartBody.Part>()
+                        imageUris.forEachIndexed { index, uri ->
+                            val file = uriToFile(context, uri, "image_$index")
+                            if (file != null) {
+                                val mimeType = getMimeType(file.name)
+                                val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
+                                // Quan trọng: Tất cả files phải có cùng tên parameter "files"
+                                val part = MultipartBody.Part.createFormData("files", file.name, requestFile)
+                                fileParts.add(part)
+                            }
+                        }
+                        val contentBody = content.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val visibilityBody = visibility.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val parentPostIdBody = parentPostId?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val response = RetrofitClient.apiService.createPostWithMedia(
+                            content = contentBody,
+                            visibility = visibilityBody,
+                            parentPostId = parentPostIdBody,
+                            files = if (fileParts.isNotEmpty()) fileParts else null
+                        )
+                        if (response.success) {
+                            fetchPosts(0)
+                            Log.d("TimelineViewModel", "Post added successfully: ${response.data}")
+                        } else {
+                            _postsState.value = _postsState.value.copy(
+                                loading = false,
+                                error = response.message ?: "Failed to add post"
+                            )
+                            Log.e("TimelineViewModel", "Failed to add post: ${response.message}")
+                        }
+                    }
+                    else{
+                        val createPostRequest = CreatePostRequest(
+                            content = content,
+                            visibility = visibility,
+                            parentPostId = parentPostId
+                        )
+                        val response = RetrofitClient.apiService.createPost(createPostRequest)
+                        if (response.success) {
+                            fetchPosts(0)
+                            Log.d("TimelineViewModel", "Post added successfully: ${response.data}")
+                        } else {
+                            _postsState.value = _postsState.value.copy(
+                                loading = false,
+                                error = response.message ?: "Failed to add post"
+                            )
+                            Log.e("TimelineViewModel", "Failed to add post: ${response.message}")
+                        }
+                    }
+
+                } catch (e: Exception) {
+                    _postsState.value = _postsState.value.copy(
+                        loading = false,
+                        error = e.message ?: "Unknown error"
+                    )
+                }
+            }
+        }
     // Repost bài đăng
     fun repost(post: Post) {
 //        val repost = post.copy(
@@ -468,6 +527,7 @@ class TimelineViewModel(private val authManager: AuthManager) : ViewModel() {
 //            }
 //        }
     }
+
 
     fun addComment(postId: Long, content: String, parentCommentId: Long? = null) {
         viewModelScope.launch {
@@ -622,4 +682,33 @@ data class PostState(
         val comments: List<Comment> = emptyList(),
         val error: String? = null
     )
+}
+
+private fun uriToFile(context: Context, uri: Uri, fileName: String): File? {
+    return try {
+        val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+        val file = File(context.cacheDir, "$fileName.jpg")
+        val outputStream = FileOutputStream(file)
+
+        inputStream?.use { input ->
+            outputStream.use { output ->
+                input.copyTo(output)
+            }
+        }
+        file
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
+private fun getMimeType(fileName: String): String {
+    return when {
+        fileName.endsWith(".jpg", true) || fileName.endsWith(".jpeg", true) -> "image/jpeg"
+        fileName.endsWith(".png", true) -> "image/png"
+        fileName.endsWith(".gif", true) -> "image/gif"
+        fileName.endsWith(".mp4", true) -> "video/mp4"
+        fileName.endsWith(".mov", true) -> "video/quicktime"
+        else -> "application/octet-stream"
+    }
 }

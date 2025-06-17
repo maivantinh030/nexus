@@ -4,6 +4,7 @@ import com.example.nexus.ui.model.ApiResponse
 import com.example.nexus.ui.model.CommentResponse
 import com.example.nexus.ui.model.CreateCommentRequest
 import com.example.nexus.ui.model.CreateCommentResponse
+import com.example.nexus.ui.model.CreateNotificationRequest
 import com.example.nexus.ui.model.CreatePostRequest
 import com.example.nexus.ui.model.Like
 import com.example.nexus.ui.model.NotificationResponse
@@ -11,6 +12,8 @@ import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.PostResponse
 import com.example.nexus.ui.model.PostResponseSingle
 import com.example.nexus.ui.model.UserResponse
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.*
 
 data class FollowDTO(
@@ -65,15 +68,6 @@ interface ApiService {
         @Query("direction") direction: String = "asc"
     ): CommentResponse
 
-    @POST("yapping/api/comments")
-    suspend fun createComment(
-        @Body request: CreateCommentRequest
-    ): CommentResponse
-
-    @POST("yapping/api/posts")
-    suspend fun createPost(
-        @Body request: CreatePostRequest
-    ): CommentResponse
 
     @GET("yapping/api/notifications")
     suspend fun getNotifications(
@@ -138,5 +132,30 @@ interface ApiService {
         @Query("targetType") targetType: String,
         @Query("targetId") targetId: Long
     ): ApiResponse<Long>
+
+    @POST("yapping/api/comments")
+    suspend fun createComment(
+        @Body request: CreateCommentRequest
+    ): CommentResponse
+
+    @Multipart
+    @POST("yapping/api/posts-with-media")
+    suspend fun createPostWithMedia(
+        @Part("content") content: RequestBody,
+        @Part("visibility") visibility: RequestBody,
+        @Part("parentPostId") parentPostId: RequestBody?,
+        @Part files: List<MultipartBody.Part>?
+    ): ApiResponse<Post>
+
+    @POST("yapping/api/notifications")
+    suspend fun createNotification(
+        @Body request: CreateNotificationRequest
+    ): ApiResponse<NotificationResponse>
+
+    @POST("yapping/api/posts")
+    suspend fun createPost(
+        @Body request: CreatePostRequest
+    ): ApiResponse<Post>
+
 
 }

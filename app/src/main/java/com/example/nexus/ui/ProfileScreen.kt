@@ -208,7 +208,7 @@ fun ProfileScreen(
                             Toast.makeText(context, "Unfollowed ${profileUser.username}", Toast.LENGTH_SHORT).show()
                         } else {
                             activityViewModel?.let { actVM ->
-                                timelineViewModel.followUser(userId, actVM)
+                                timelineViewModel.followUser(userId)
                                 Toast.makeText(context, "Followed ${profileUser.username}", Toast.LENGTH_SHORT).show()
                             } ?: run {
                                 Toast.makeText(context, "Cannot follow user at this time", Toast.LENGTH_SHORT).show()

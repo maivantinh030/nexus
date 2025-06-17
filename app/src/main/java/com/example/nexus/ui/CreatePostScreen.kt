@@ -1,10 +1,14 @@
 package com.example.nexus.ui
 
+import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.annotation.RequiresApi
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,10 +18,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -41,18 +49,28 @@ import androidx.navigation.NavController
 import com.example.nexus.R
 import com.example.nexus.ui.timeline.TimelineViewModel
 import coil.compose.AsyncImage
+import com.example.nexus.network.RetrofitClient
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineViewModel?=null) {
+fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineViewModel) {
     val context = LocalContext.current
     var content by remember { mutableStateOf("") }
-    var imageUri by remember { mutableStateOf<String?>(null) }
+
+    var imageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    val currentUser = viewModel?.currentUser
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            imageUri = uri.toString()
-            Toast.makeText(context, "Selected image: $uri", Toast.LENGTH_SHORT).show()
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            // Giới hạn tối đa 5 ảnh để tránh quá tải
+            val selectedUris = if (uris.size > 5) uris.take(5) else uris
+            imageUris = selectedUris
+            Toast.makeText(
+                context,
+                "Đã chọn ${selectedUris.size} ảnh${if (uris.size > 5) " (tối đa 5 ảnh)" else ""}",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
     Column(
@@ -84,16 +102,16 @@ fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineView
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 16.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_avatar_placeholder),
+            AsyncImage(
+                model = (RetrofitClient.MEDIA_BASE_URL + currentUser?.profilePicture),
                 contentDescription = "User avatar",
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(60.dp)
                     .clip(CircleShape)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "user1", // Giả lập username
+                text = currentUser?.username ?: "",
                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp)
             )
         }
@@ -107,18 +125,49 @@ fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineView
             textStyle = MaterialTheme.typography.bodyMedium
         )
         Spacer(modifier = Modifier.height(8.dp))
-        imageUri?.let { uri->
-            AsyncImage(
-                model = uri,
-                contentDescription = "Selected image",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                contentScale = ContentScale.Crop
-            )
-            Spacer(modifier = Modifier.height(8.dp))
 
+        if(imageUris.isNotEmpty()){
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ){
+                items(imageUris) { uri ->
+                    Box {
+                        Card(
+                            modifier = Modifier.size(120.dp)
+                        ){
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Selected image",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(MaterialTheme.shapes.medium),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+
+                        // Nút xóa được đặt ở góc trên bên phải
+                        IconButton(
+                            onClick = {
+                                imageUris = imageUris.filterNot { it == uri }
+                                Toast.makeText(context, "Đã xóa ảnh", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Remove Image",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -133,7 +182,7 @@ fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineView
                 )
             }
             Text(
-                text = "Attach image",
+                text = if(imageUris.isEmpty()) "Attach images" else "Add more image",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -141,9 +190,16 @@ fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineView
         Button(
             onClick = {
                 if(content.isNotBlank()){
-                    viewModel?.addPost(content)
+                    viewModel.addPost(
+                        content = content,
+                        visibility = "PUBLIC", // Hoặc lấy từ lựa chọn của người dùng
+                        parentPostId = null, // Nếu không phải trả lời bài đăng nào
+                        imageUris = imageUris // Truyền danh sách ảnh đã chọn
+                    )
+
                     Toast.makeText(context,"Posted: $content",Toast.LENGTH_SHORT).show()
                     content = ""
+                    imageUris = emptyList()
                 }
                 else{
                     Toast.makeText(context,"hay nhap noi dung",Toast.LENGTH_SHORT).show()
@@ -157,8 +213,8 @@ fun CreatePostScreen(navController: NavController?= null,viewModel: TimelineView
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun CreatePostScreenPreview() {
-    CreatePostScreen()
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun CreatePostScreenPreview() {
+//    CreatePostScreen()
+//}

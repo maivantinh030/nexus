@@ -1,9 +1,9 @@
 package com.example.nexus.ui.model
 
-class CreatePostRequest {
-    data class CreatePostRequest(
+import android.net.Uri
+
+data class CreatePostRequest(
         val content: String,
         val visibility: String,
-        val postType: Int?
+        val parentPostId: Long? = null
     )
-}

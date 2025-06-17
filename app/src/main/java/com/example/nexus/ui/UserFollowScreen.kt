@@ -218,7 +218,7 @@ fun UserItem(
                     }
                     else{
                         activityViewModel?.let {actVM->
-                            timelineViewModel.followUser(user.id?: return@TextButton,actVM)
+                            timelineViewModel.followUser(user.id?: return@TextButton)
                             Toast.makeText(context,"Follow ${user.username}",Toast.LENGTH_SHORT).show()
                         }?: run {
                             Toast.makeText(context, "Cannot follow user at this time", Toast.LENGTH_SHORT).show()

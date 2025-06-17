@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.nexus.network.RetrofitClient
+import com.example.nexus.ui.model.CreateNotificationRequest
 import com.example.nexus.ui.model.Notification
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
@@ -158,33 +159,38 @@ class ActivityViewModel : ViewModel() {
         targetType: String,
         targetId: Long?,
         targetOwnerId: Long?,
-        createdAt: String
     ) {
-        val newNotification = Notification(
-            id = (_notificationState.value.notifications.maxOfOrNull { it.id } ?: 0) + 1,
-            userId = userId,
-            username = "", // Sẽ cần lấy từ API hoặc cache
-            userFullName = "",
-            userProfilePicture = null,
-            actorId = actorId,
-            actorUsername = "", // Sẽ cần lấy từ API hoặc cache
-            actorFullName = "",
-            actorProfilePicture = null,
-            type = type,
-            targetType = targetType,
-            targetId = targetId,
-            targetOwnerId = targetOwnerId,
-            targetOwnerUsername = null,
-            targetOwnerFullName = null,
-            isRead = false,
-            createdAt = createdAt,
-            message = "", // Backend sẽ generate message
-            redirectUrl = ""
-        )
+        viewModelScope.launch {
+            try{
+                val createNotificationRequest = CreateNotificationRequest(
+                    userId = userId,
+                    actorId = actorId,
+                    type = type,
+                    targetType = targetType,
+                    targetId = targetId ?: 0L, // Nếu không có targetId thì dùng 0
+                    targetOwnerId = targetOwnerId ?: 0L // Nếu không có targetOwnerId thì dùng 0
+                )
+                val response = RetrofitClient.apiService.createNotification(createNotificationRequest)
+                if(response.success){
+                    Log.d("ActivityViewModel", "Notification added successfully: ${response.data}")
+                    // Cập nhật state với thông báo mới
+                    _notificationState.value = _notificationState.value.copy(
+                        notifications = (_notificationState.value.notifications + response.data) as List<Notification>,
+                        error = null
+                    )
+                } else {
+                    Log.e("ActivityViewModel", "Error adding notification: ${response.message}")
+                    _notificationState.value = _notificationState.value.copy(
+                        error = response.message ?: "Không thể thêm thông báo"
+                    )
+                }
+            }
 
-        _notificationState.value = _notificationState.value.copy(
-            notifications = listOf(newNotification) + _notificationState.value.notifications
-        )
+            catch (e: Exception) {
+                Log.e("ActivityViewModel", "Error adding notification: ${e.message}", e)
+
+            }
+        }
     }
 
     data class NotificationState(

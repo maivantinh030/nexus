@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL =
-        "http://10.0.2.2:8080/" // Dùng cho emulator, thay bằng IP nếu chạy trên thiết bị thật
-    const val MEDIA_BASE_URL = "http://10.0.2.2/yapping"
+        "http://192.168.0.105:8080/" // Dùng cho emulator, thay bằng IP nếu chạy trên thiết bị thật
+    const val MEDIA_BASE_URL = "http://192.168.0.105:8080/yapping"
 
     private lateinit var authManager: AuthManager
 

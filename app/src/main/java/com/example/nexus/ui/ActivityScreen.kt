@@ -356,7 +356,7 @@ fun NotificationCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = {
-                        timelineViewModel.followUser(notification.actorId, activityViewModel)
+                        timelineViewModel.followUser(notification.actorId)
                         activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
                         Toast.makeText(context, "Followed back", Toast.LENGTH_SHORT).show()
                     },

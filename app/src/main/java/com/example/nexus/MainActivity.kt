@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val authManager = AuthManager(this)
-        val timelineViewModel = TimelineViewModel(authManager)
+        val timelineViewModel = TimelineViewModel(authManager, this)
         RetrofitClient.initialize(authManager)
 
         setContent {

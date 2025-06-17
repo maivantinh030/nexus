@@ -52,7 +52,7 @@ import com.example.nexus.ui.timeline.TimelineViewModel
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun AppNavGraph(viewModel: TimelineViewModel = TimelineViewModel(authManager = AuthManager(LocalContext.current))) {
+fun AppNavGraph(viewModel: TimelineViewModel = TimelineViewModel(authManager = AuthManager(LocalContext.current), context = LocalContext.current)) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
