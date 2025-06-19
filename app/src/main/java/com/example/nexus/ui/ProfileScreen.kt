@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +52,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -59,7 +59,6 @@ import coil.compose.AsyncImage
 import com.example.nexus.R
 import com.example.nexus.components.PostItem
 import com.example.nexus.ui.activity.ActivityViewModel
-import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
 import com.example.nexus.ui.timeline.TimelineViewModel
 import kotlinx.coroutines.launch
@@ -76,9 +75,10 @@ fun ProfileScreen(
     var followers by remember { mutableStateOf<List<User>>(emptyList()) }
     var following by remember { mutableStateOf<List<User>>(emptyList()) }
     var user: User? by remember { mutableStateOf(null) }
-//    val posts by timelineViewModel.postsState.value.posts
+    val viewState by timelineViewModel.postsState
     val follows by timelineViewModel.follows.collectAsState()
     val context = LocalContext.current
+    timelineViewModel.fetchPostsUser(userId)
 
     LaunchedEffect(userId) {
         scope.launch {
@@ -88,7 +88,6 @@ fun ProfileScreen(
         }
     }
     // Tìm người dùng dựa trên userId (sử dụng posts đã thu thập)
-
     val currentUserId = timelineViewModel.currentUserId
     val isOwnProfile = userId == currentUserId
     // Kiểm tra trạng thái theo dõi
@@ -105,7 +104,6 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -184,8 +182,6 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(16.dp))
             if (isOwnProfile) {
                 // Own profile: Settings and Edit Profile buttons
-
-
                     Button(
                         onClick = {
                             Toast.makeText(context, "Edit Profile clicked", Toast.LENGTH_SHORT).show()
@@ -198,7 +194,6 @@ fun ProfileScreen(
                     ) {
                         Text("Edit Profile")
                     }
-
             } else {
                 // Other user's profile: Follow/Unfollow button
                 Button(
@@ -240,6 +235,37 @@ fun ProfileScreen(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
+
+            when{
+                viewState.loading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentSize(Alignment.Center)
+                    )
+                }
+                viewState.error != null -> {
+                    Text(
+                        text = "Error: ${viewState.error}",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+                else -> {
+                    // Hiển thị danh sách bài đăng
+                    LazyColumn {
+                        items(viewState.posts) { post ->
+                            PostItem(
+                                post = post,
+                                viewModel = timelineViewModel,
+                                navController = navController,
+                                activityViewModel = activityViewModel
+                            )
+                        }
+                    }
+                }
+            }
 
             // Hiển thị danh sách bài đăng của người dùng
 //            val userPosts = remember(posts) {

@@ -109,6 +109,29 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
         }
     }
 
+
+    fun fetchPostsUser(userId: Long) {
+        viewModelScope.launch {
+            try{
+               val response = RetrofitClient.apiService.getPostsByUser(userId)
+                if(response.success){
+                    _postsState.value = PostState(
+                        loading = false,
+                        posts = response.data.content,
+                        currentPage = 0,
+                        last = response.data.last,
+                        error = null
+                    )
+                }
+            }
+            catch (e: Exception) {
+                _postsState.value = _postsState.value.copy(
+                    loading = false,
+                    error = "Không thể lấy bài đăng của người dùng"
+                )
+            }
+        }
+    }
     // Thêm _currentPost để lưu trữ bài đăng hiện tại
     private val _currentPost = mutableStateOf<Post?>(null)
     val currentPost: State<Post?> = _currentPost
@@ -136,7 +159,6 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             null
         }
     }
-
     suspend fun fetchLikeCount(targetType: String, targetId: Long): Long {
         return try {
             val response = RetrofitClient.apiService.countLikes(targetType, targetId)
@@ -260,7 +282,6 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
                             val childComments = childResponse.data?.content ?: emptyList() // Bảo vệ chống null
                             rootComment.copy(replies = childComments)
                         }
-
                     }
                     _commentState.value = CommentState(
                         loading = false,
@@ -295,7 +316,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
     val follows: StateFlow<List<Pair<Long, Long>>> = _follows.asStateFlow()
 
     // Kiểm tra xem người dùng có id là userId1 có follow người dùng có id là userId2 không
-        fun isFollowing(userId1: Long,userId2: Long): Boolean {
+    fun isFollowing(userId1: Long,userId2: Long): Boolean {
             return _follows.value.any { it.first == userId1 && it.second == userId2 }
         }
 
@@ -411,12 +432,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
     // Thêm bài đăng mới
     @OptIn(UnstableApi::class)
     @RequiresApi(Build.VERSION_CODES.O)
-        fun addPost(
-        content: String,
-        visibility: String = "PUBLIC",
-        parentPostId: Long? = null,
-        imageUris: List<Uri>
-    ) {
+        fun addPost(content: String, visibility: String = "PUBLIC", parentPostId: Long? = null, imageUris: List<Uri>) {
             viewModelScope.launch {
                 try {
                     if(imageUris.isEmpty()){
@@ -573,103 +589,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             }
         }
     }
-
-
-    fun toggleCommentLike(postId: Long, commentId: Long, isReply: Boolean) {
-//        _currentPost.value?.let { currentPost ->
-//            if (isReply) {
-//                val updatedComments = currentPost.comments.map { comment ->
-//                    val updatedReplies = comment.replies.map { reply ->
-//                        if (reply.id == commentId) {
-//                            reply.copy(
-//                                isLiked = !reply.isLiked,
-//                                like_count = if (reply.isLiked) reply.like_count - 1 else reply.like_count + 1
-//                            )
-//                        } else {
-//                            reply
-//                        }
-//                    }
-//                    comment.copy(replies = updatedReplies)
-//                }
-//                _currentPost.value = currentPost.copy(comments = updatedComments)
-//            } else {
-//                val updatedComments = currentPost.comments.map { comment ->
-//                    if (comment.id == commentId) {
-//                        comment.copy(
-//                            isLiked = !comment.isLiked,
-//                            like_count = if (comment.isLiked) comment.like_count - 1 else comment.like_count + 1
-//                        )
-//                    } else {
-//                        comment
-//                    }
-//                }
-//                _currentPost.value = currentPost.copy(comments = updatedComments)
-//            }
-//        }
-    }
-
-//    fun updatePosts(newPosts: List<Post>) {
-//        _posts.value = newPosts
-//    }
-
-//    private fun createMockPosts(): List<Post> {
-//        return listOf(
-//            Post(
-//                id = 1,
-//                user = User(id = 1, username = "Static", bio = "Hello!", profile_picture = "https://scontent.fhan20-1.fna.fbcdn.net/v/t39.30808-6/475308019_1955546638268380_6109831544270026139_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFdGNNCtWVrzSOP6vQg4tGmtXYybfc9VQa1djJt9z1VBmZgSYjXfmhe951gwvIOrh84zRZtb7YIDn8WGOjHAdzn&_nc_ohc=8pApWMt6OrQQ7kNvwGdi4N9&_nc_oc=AdkD1w1GiqenC1qbHrrQ3TNUTCNCiYhnNac6hPJWmMYl6VaOqV1DcsORW5q2h4_q3e4&_nc_zt=23&_nc_ht=scontent.fhan20-1.fna&_nc_gid=H6suFPkvvqfq1xfoaanbDA&oh=00_AfJsqKffcOZips3yWtW7AluCTsWZV-vaz3W98WRiPQngVA&oe=68430D30"),
-//                content = "This is my first post!",
-//                imageUri = "https://scontent.fhan2-4.fna.fbcdn.net/v/t1.6435-9/97472353_1133757603684786_9168272966566281216_n.jpg?_nc_cat=110&ccb=1-7&_nc_sid=94e2a3&_nc_eui2=AeF0P8eM1XIbw07XoH5ymXHbpLbfEhYNV_6ktt8SFg1X_gTvH7LivzJVLSfSKg3LPpytPCBcsCg7d6kYD5VyMa5W&_nc_ohc=TmHTOTPJX7kQ7kNvwEh7IH-&_nc_oc=Adl1Pgtjm_50JEASOooX_Y0rzvr0GVJheSMtpj4O0zRm172NMqQQxC5BPr_6ejVN-Vg&_nc_zt=23&_nc_ht=scontent.fhan2-4.fna&_nc_gid=jWzh3B8Pvo0TaC64_X4_3g&oh=00_AfKSX1HyyTLzKIVw_AtHivoGJQt3yYwQDDH8HjYAMuSTjg&oe=6864CC4E",
-//                created_at = "2025-05-13T14:55:00Z",
-//                updated_at = "2025-05-13T14:55:00Z",
-//                comments = listOf(
-//                    Comment(
-//                        id = 1,
-//                        post_id = 1,
-//                        user = User(id = 2, username = "user2", bio = "Loving this app!", profile_picture = "https://example.com/avatar2.jpg"),
-//                        content = "Great post!",
-//                        created_at = "2025-05-13T14:55:00Z",
-//                        updated_at = "2025-05-13T14:55:00Z",
-//                        replies = listOf(
-//                            Comment(
-//                                id = 2,
-//                                post_id = 1,
-//                                user = User(id = 1, username = "user1", bio = "Hello!", profile_picture = "https://scontent.fhan20-1.fna.fbcdn.net/v/t39.30808-6/475308019_1955546638268380_6109831544270026139_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFdGNNCtWVrzSOP6vQg4tGmtXYybfc9VQa1djJt9z1VBmZgSYjXfmhe951gwvIOrh84zRZtb7YIDn8WGOjHAdzn&_nc_ohc=8pApWMt6OrQQ7kNvwGdi4N9&_nc_oc=AdkD1w1GiqenC1qbHrrQ3TNUTCNCiYhnNac6hPJWmMYl6VaOqV1DcsORW5q2h4_q3e4&_nc_zt=23&_nc_ht=scontent.fhan20-1.fna&_nc_gid=H6suFPkvvqfq1xfoaanbDA&oh=00_AfJsqKffcOZips3yWtW7AluCTsWZV-vaz3W98WRiPQngVA&oe=68430D30"),
-//                                parent_comment_id = 1,
-//                                content = "Thanks!",
-//                                created_at = "2025-05-13T14:55:00Z",
-//                                updated_at = "2025-05-13T14:55:00Z"
-//                            ),
-//                            Comment(
-//                                id = 3,
-//                                post_id = 1,
-//                                user = User(id = 2, username = "user2", bio = "Loving this app!", profile_picture = "https://example.com/avatar2.jpg"),
-//                                parent_comment_id = 1,
-//                                content = "You're welcome!",
-//                                created_at = "2025-05-13T14:55:00Z",
-//                                updated_at = "2025-05-13T14:55:00Z"
-//                            )
-//                        )
-//                    )
-//                )
-//            ),
-//            Post(
-//                id = 2,
-//                user = User(id = 2, username = "Nghĩa", bio = "Loving this app!", profile_picture = "https://scontent.fhan2-4.fna.fbcdn.net/v/t39.30808-6/467222594_1257944542111805_7180808345332579320_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFrUWF1yI-xCz0oCwTSJSpNwPkFIZ5dyZTA-QUhnl3JlBNDdwd98JhN-O_0EpK2XOFp7nhe6FqlQ28LXl8_XPOB&_nc_ohc=CyI0sH7lEWMQ7kNvwEjxL6u&_nc_oc=Adk8f-CfA9x1rzY73KnPIAln5pgZZ0g4jGicomUeeaCMWs9a_Jvfi-jb4KshP1BiGaE&_nc_zt=23&_nc_ht=scontent.fhan2-4.fna&_nc_gid=CnEqSe_neqY6ZmrX605T_g&oh=00_AfJrebZhwBj9i4qbuBWF5qFH6uNCqg-LiCmQQZm7nHAaJQ&oe=6843075D"),
-//                content = "Bài đăng thứ 2!",
-//                imageUri = "https://image.dienthoaivui.com.vn/x,webp,q90/https://dashboard.dienthoaivui.com.vn/uploads/dashboard/editor_upload/anh-meme-1.jpg",
-//                created_at = "2025-05-13T14:55:00Z",
-//                updated_at = "2025-05-13T14:55:00Z"
-//            ),
-//            Post(
-//                id = 3,
-//                user = User(id = 3, username = "user3", bio = "Just joined!", profile_picture = "https://example.com/avatar3.jpg"),
-//                content = "Hello everyone!",
-//                created_at = "2025-05-13T14:55:00Z",
-//                updated_at = "2025-05-13T14:55:00Z"
-//            )
-//        )
-//    }
-data class PostState(
+    data class PostState(
     val loading: Boolean = true,
     val loadingMore: Boolean = false,
     val posts: List<Post> = emptyList(),

@@ -46,6 +46,12 @@ interface ApiService {
         @Query("page") page: Int = 0,
         @Query("size") size: Int = 5
     ): PostResponse
+    @GET("yapping/api/posts/user/{userId}")
+    suspend fun getPostsByUser(
+        @Path("userId") userId: Long,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 5
+    ): PostResponse
 
     @GET("yapping/api/posts/{id}")
     suspend fun getPostById(

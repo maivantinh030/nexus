@@ -193,10 +193,7 @@ fun PostDetailContent(
         }
         post.isLiked = viewModel.checkLike("POST", post.id ?: 0)
         viewModel.fetchLikeCount("POST",post.id?:0)
-        val comments = viewModel.commentState.value.comments
-        comments.forEach { comment ->
-            Log.d("PostDetailScreen", "Comment: id=${comment.id}, content=${comment.content}")
-        }
+
     }
 
     LaunchedEffect(triggerAnimation) {
