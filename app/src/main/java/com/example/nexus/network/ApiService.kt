@@ -33,6 +33,12 @@ data class LoginRequest(
     val password: String
 )
 
+data class CreateMentionRequest(
+    val postId: Long?,
+    val commentId: Long?,
+    val mentionedUserId: Long
+)
+
 data class AuthenticationResponse(
     val access_token: String,
     val refresh_token: String,
@@ -172,4 +178,8 @@ interface ApiService {
         @Path("userId") userId: Long
     ): ApiResponse<Any>
 
+    @POST("yapping/api/mentions/from-text")
+    suspend fun createMention(
+        @Body request: CreateMentionRequest
+    ): ApiResponse<Any>
 }

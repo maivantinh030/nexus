@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
 import com.example.nexus.network.AuthManager
+import com.example.nexus.network.CreateMentionRequest
 import com.example.nexus.network.RetrofitClient
 import com.example.nexus.ui.activity.ActivityViewModel
 import com.example.nexus.ui.model.Comment
@@ -342,6 +343,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
     )
     val follows: StateFlow<List<Pair<Long, Long>>> = _follows.asStateFlow()
 
+
     // Kiểm tra xem người dùng có id là userId1 có follow người dùng có id là userId2 không
     fun isFollowing(userId1: Long,userId2: Long): Boolean {
             return _follows.value.any { it.first == userId1 && it.second == userId2 }
@@ -570,6 +572,26 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
 //        }
     }
 
+    @OptIn(UnstableApi::class)
+    fun createMention(postId: Long? = null, commentId: Long? = null, mentionedUserId: Long) {
+        viewModelScope.launch {
+            try {
+                val request = CreateMentionRequest(
+                    postId = postId,
+                    commentId = commentId,
+                    mentionedUserId = mentionedUserId
+                )
+                val response = RetrofitClient.apiService.createMention(request)
+                if (response.success) {
+                    Log.d("TimelineViewModel", "Mention created successfully")
+                } else {
+                    Log.e("TimelineViewModel", "Failed to create mention: ${response.message}")
+                }
+            } catch (e: Exception) {
+                Log.e("TimelineViewModel", "Error creating mention: ${e.message}")
+            }
+        }
+    }
 
     fun addComment(postId: Long, content: String, parentCommentId: Long? = null) {
         viewModelScope.launch {

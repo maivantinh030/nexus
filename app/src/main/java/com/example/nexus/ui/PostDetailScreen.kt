@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +71,7 @@ import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
 import com.example.nexus.ui.timeline.TimelineViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -173,7 +177,8 @@ fun PostDetailContent(
     post: Post,
     viewModel: TimelineViewModel,
     activityViewModel: ActivityViewModel? = null,
-    navController: NavController? = null
+    navController: NavController? = null,
+    onUserTagged: (User) -> Unit = { /* Default no-op */ }
 ) {
     val viewState by viewModel.commentState
     val context = LocalContext.current
@@ -185,6 +190,10 @@ fun PostDetailContent(
     var scale by remember { mutableStateOf(1f) }
     var triggerAnimation by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var expanded by remember { mutableStateOf(false) }
+    var suggestions by remember { mutableStateOf(emptyList<User>()) }
+    var listUserFollowing = viewModel.listUserFollowing.collectAsState().value
+    val mentionUserId = remember { mutableStateOf<Long?>(null) }
 
     // Fetch comments when component loads
     LaunchedEffect(post.id) {
@@ -397,20 +406,67 @@ fun PostDetailContent(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = commentContent,
-                    onValueChange = { commentContent = it },
-                    label = {
-                        Text(
-                            if (replyingToCommentId != null) "Replying to ${replyingToUsername ?: "comment"}..."
-                            else "Add a comment..."
-                        )
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp),
-                    textStyle = MaterialTheme.typography.bodyMedium
-                )
+                Column(modifier = Modifier.fillMaxWidth(0.8f)) {
+                    OutlinedTextField(
+                        value = commentContent,
+                        onValueChange = { newText->
+                            commentContent = newText
+
+                            val mentionIndex = newText.lastIndexOf("@")
+                            if(mentionIndex != -1){
+                                val keyword = newText.substring(mentionIndex + 1)
+                                suggestions = listUserFollowing.filter {
+                                    it.username.contains(keyword, ignoreCase = true)
+                                            || it.fullName?.contains(keyword, ignoreCase = true) == true
+                                }.take(5)
+                                expanded = suggestions.isNotEmpty()
+                            }
+                            else{
+                                expanded = false
+                            }
+                        },
+                        label = {
+                            Text(
+                                if (replyingToCommentId != null) "Replying to ${replyingToUsername ?: "comment"}..."
+                                else "Add a comment..."
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        textStyle = MaterialTheme.typography.bodyMedium
+                    )
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = {expanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        suggestions.forEach {user ->
+                            DropdownMenuItem(
+                                text ={
+                                    Row(verticalAlignment = Alignment.CenterVertically){
+                                        AsyncImage(
+                                            model = RetrofitClient.MEDIA_BASE_URL + user.profilePicture,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(24.dp).clip(CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(text = "${user.fullName} (@${user.username})")
+                                    }
+                                },
+                                onClick = {
+                                    val mentionIndex = commentContent.lastIndexOf('@')
+                                    commentContent = commentContent.substring(0, mentionIndex + 1) + user.fullName + " "
+                                    expanded = false
+                                    onUserTagged(user)
+                                    mentionUserId.value = user.id // Lưu ID người dùng được gắn thẻ
+                                }
+                            )
+
+                        }
+                    }
+
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = {
@@ -422,6 +478,7 @@ fun PostDetailContent(
                                     } else {
                                         viewModel.addComment(post.id ?: 0, commentContent)
                                     }
+                                    viewModel.createMention(post.id, replyingToCommentId, mentionUserId.value ?: 0)
                                     Log.d("PostDetailScreen", "Adding comment to post ${post.id} replying to comment $replyingToCommentId")
                                     Toast.makeText(context, "Comment added!", Toast.LENGTH_SHORT).show()
                                     commentContent = ""
