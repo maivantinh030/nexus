@@ -50,7 +50,9 @@ import com.example.nexus.ui.timeline.TimelineViewModel
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import com.google.android.play.core.integrity.i
 import kotlinx.coroutines.launch
+import kotlin.collections.contains
 
 @Composable
 fun UserFollowScreen(
@@ -159,9 +161,15 @@ fun UserItem(
 ){
     val follows by timelineViewModel.follows.collectAsState()
     val currentUserId = 1L
-    val isFollowing = remember(follows) {
-        timelineViewModel.isFollowing(currentUserId, user.id ?: -1)
+    var isFollowing by remember{mutableStateOf(false)}
+    if(timelineViewModel.listUserFollowing.collectAsState().value.contains(user)){
+        // Nếu người dùng không phải là chính mình và đã theo dõi người dùng này
+        isFollowing = true
+    } else {
+        isFollowing = false
+
     }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     Card(
         modifier = Modifier
@@ -212,16 +220,13 @@ fun UserItem(
             Spacer(modifier = Modifier.weight(1f))
             TextButton(
                 onClick = {
-                    if(isFollowing){
-                        timelineViewModel.unfollowUser(user.id?: return@TextButton)
-                        Toast.makeText(context,"Unfollow ${user.username}",Toast.LENGTH_SHORT).show()
-                    }
-                    else{
-                        activityViewModel?.let {actVM->
-                            timelineViewModel.followUser(user.id?: return@TextButton)
-                            Toast.makeText(context,"Follow ${user.username}",Toast.LENGTH_SHORT).show()
-                        }?: run {
-                            Toast.makeText(context, "Cannot follow user at this time", Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                        if (isFollowing) {
+                            timelineViewModel.unfollowUser(user.id ?: -1)
+                            timelineViewModel.fetchUserFollowersAndFollowing()
+                        } else {
+                            timelineViewModel.followUser(user.id ?: -1)
+                            timelineViewModel.fetchUserFollowersAndFollowing()
                         }
                     }
                 },

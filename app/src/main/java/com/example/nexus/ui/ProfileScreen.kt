@@ -78,6 +78,7 @@ fun ProfileScreen(
     val viewState by timelineViewModel.postsState
     val follows by timelineViewModel.follows.collectAsState()
     val context = LocalContext.current
+    var isFollowing by remember{mutableStateOf(false)}
     timelineViewModel.fetchPostsUser(userId)
 
     LaunchedEffect(userId) {
@@ -91,12 +92,13 @@ fun ProfileScreen(
     val currentUserId = timelineViewModel.currentUserId
     val isOwnProfile = userId == currentUserId
     // Kiểm tra trạng thái theo dõi
-    val isFollowing = remember(follows, userId, currentUserId) {
-        if (!isOwnProfile) {
-            timelineViewModel.isFollowing(currentUserId?: 0,userId)
-        } else {
-            false // Giá trị mặc định khi xem profile của chính mình (không quan trọng)
-        }
+
+    if(!isOwnProfile && timelineViewModel.listUserFollowing.collectAsState().value.contains(user)){
+        // Nếu người dùng không phải là chính mình và đã theo dõi người dùng này
+        isFollowing = true
+    } else {
+        isFollowing = false
+
     }
     user?.let { profileUser ->
         Column(
@@ -198,15 +200,13 @@ fun ProfileScreen(
                 // Other user's profile: Follow/Unfollow button
                 Button(
                     onClick = {
-                        if (isFollowing) {
-                            timelineViewModel.unfollowUser(userId)
-                            Toast.makeText(context, "Unfollowed ${profileUser.username}", Toast.LENGTH_SHORT).show()
-                        } else {
-                            activityViewModel?.let { actVM ->
+                        scope.launch {
+                            if (isFollowing) {
+                                timelineViewModel.unfollowUser(userId)
+                                timelineViewModel.fetchUserFollowersAndFollowing()
+                            } else {
                                 timelineViewModel.followUser(userId)
-                                Toast.makeText(context, "Followed ${profileUser.username}", Toast.LENGTH_SHORT).show()
-                            } ?: run {
-                                Toast.makeText(context, "Cannot follow user at this time", Toast.LENGTH_SHORT).show()
+                                timelineViewModel.fetchUserFollowersAndFollowing()
                             }
                         }
                     },

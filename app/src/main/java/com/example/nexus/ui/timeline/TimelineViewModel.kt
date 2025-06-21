@@ -48,11 +48,18 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
     private val _postCache = MutableStateFlow<Map<Long, Post>>(emptyMap())
     val postCache: StateFlow<Map<Long, Post>> = _postCache.asStateFlow()
     val activityViewModel = ActivityViewModel()
+    // Chuyển sang MutableStateFlow để quản lý bất đồng bộ
+    private val _listUserFollow = MutableStateFlow<List<User>>(emptyList())
+    val listUserFollow: StateFlow<List<User>> = _listUserFollow.asStateFlow()
+
+    private val _listUserFollowing = MutableStateFlow<List<User>>(emptyList())
+    val listUserFollowing: StateFlow<List<User>> = _listUserFollowing.asStateFlow()
     @RequiresApi(Build.VERSION_CODES.O)
     val currentTime = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
     init {
         // Lấy dữ liệu bài đăng từ API khi ViewModel được khởi tạo
         fetchPosts()
+        fetchUserFollowersAndFollowing()
     }
     private fun fetchPosts(page: Int = 0){
         viewModelScope.launch {
@@ -145,6 +152,26 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
         get() = authManager.getUserId()
     val currentUser : User?
         get() = currentUserId?.let { _userCache.value[it] }
+    // Lấy danh sách người dùng theo dõi và đang theo dõi của người dùng hiện tại
+    fun fetchUserFollowersAndFollowing() {
+        currentUserId?.let { userId ->
+            viewModelScope.launch {
+                try {
+                    println("Fetching followers and following for user $userId")
+                    // Lấy danh sách follower
+                    val followers = getFollowers(userId)
+                    _listUserFollow.value = followers
+                    println("Stored ${followers.size} followers: $followers")
+                    // Lấy danh sách following
+                    val following = getFollowing(userId)
+                    _listUserFollowing.value = following
+                    println("Stored ${following.size} following: $following")
+                } catch (e: Exception) {
+                    println("Error fetching followers/following: ${e.message}")
+                }
+            }
+        }
+    }
     suspend fun getUserById(userId: Long): User? {
         _userCache.value[userId]?.let { return it }
         return try {
@@ -321,27 +348,27 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
         }
 
     // Theo dõi một người dùng
-    fun followUser(userId: Long) {
-        currentUserId?.let { currentId ->
-            if (!isFollowing(currentId, userId)) {
-                _follows.value = _follows.value + Pair(currentId, userId)
-                activityViewModel.addNotification(
-                    userId = userId,
-                    actorId = currentId,
-                    type = "FOLLOW",
-                    targetType = "USER",
-                    targetId = userId,
-                    targetOwnerId = userId
-                )
+    suspend fun followUser(userId: Long) {
+        currentUserId.let{
+            try{
+                val response = RetrofitClient.apiService.followUser(userId)
+            }
+            catch (e: Exception) {
+                e.printStackTrace()
+
             }
         }
     }
 
     // Bỏ theo dõi một người dùng
-    fun unfollowUser(userId: Long) {
-        currentUserId?.let { currentId ->
-            if (isFollowing(currentId, userId)) {
-                _follows.value = _follows.value.filterNot { it.first == currentId && it.second == userId }
+    suspend fun unfollowUser(userId: Long) {
+        currentUserId.let{
+            try{
+                val response = RetrofitClient.apiService.unfollowUser(userId)
+            }
+            catch (e: Exception) {
+                e.printStackTrace()
+
             }
         }
     }
@@ -363,7 +390,6 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
                         targetId = postId,
                         targetOwnerId = _postCache.value[postId]?.user?.id ?: 0
                     )
-
                 }
                 else{
                     _postsState.value = _postsState.value.copy(error = response.message ?: "Failed to like post")

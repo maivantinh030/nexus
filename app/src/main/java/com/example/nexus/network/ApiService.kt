@@ -163,5 +163,13 @@ interface ApiService {
         @Body request: CreatePostRequest
     ): ApiResponse<Post>
 
+    @POST("yapping/api/users/{userId}/follow")
+    suspend fun followUser(
+        @Path("userId") userId: Long
+    ): ApiResponse<Any>
+    @DELETE("yapping/api/users/{userId}/unfollow")
+    suspend fun unfollowUser(
+        @Path("userId") userId: Long
+    ): ApiResponse<Any>
 
 }

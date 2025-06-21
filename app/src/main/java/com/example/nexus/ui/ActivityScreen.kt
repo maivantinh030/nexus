@@ -356,9 +356,12 @@ fun NotificationCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = {
-                        timelineViewModel.followUser(notification.actorId)
-                        activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
-                        Toast.makeText(context, "Followed back", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            timelineViewModel.followUser(notification.actorId)
+                            activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
+                            Toast.makeText(context, "Followed back", Toast.LENGTH_SHORT).show()
+                        }
+
                     },
                     modifier = Modifier.height(36.dp),
                     shape = RoundedCornerShape(18.dp)
