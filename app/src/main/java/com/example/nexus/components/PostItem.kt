@@ -121,7 +121,7 @@ fun PostItem(post: Post,
             pressedElevation = 12.dp
         ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor =Color(0xFFF5F7FA)
         ),
         shape = RoundedCornerShape(16.dp)
     ) {

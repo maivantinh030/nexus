@@ -9,6 +9,8 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -31,6 +33,25 @@ private val LightColorScheme = lightColorScheme(
     onBackground = Color(0xFF1C1B1F),
     onSurface = Color(0xFF1C1B1F),
     */
+)
+// Định nghĩa màu gradient
+val GradientTopColor = Color(0xFFB8D4E3)
+val GradientBottomColor = Color(0xFFE8F4F8)
+
+// Tạo gradient brush
+val AppGradientBrush = Brush.verticalGradient(
+    colors = listOf(
+        GradientTopColor,
+        GradientBottomColor
+    )
+)
+
+// Alternative gradients
+val DarkGradientBrush = Brush.verticalGradient(
+    colors = listOf(
+        Color(0xFF2C3E50),
+        Color(0xFF34495E)
+    )
 )
 
 @Composable

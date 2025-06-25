@@ -4,7 +4,9 @@ import android.os.Build
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -68,74 +72,83 @@ fun TimelineScreen(
 //        }
 //    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Compose UI để tạo bài đăng mới
-        Row(
+    Box(
+        modifier = Modifier.fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+            )
+            )
+    ){
+        Column(
             modifier = Modifier
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(16.dp)
         ) {
-            AsyncImage(
-                model = (RetrofitClient.MEDIA_BASE_URL + viewModel.currentUser?.profilePicture),
-                contentDescription = "User avatar",
+            // Compose UI để tạo bài đăng mới
+            Row(
                 modifier = Modifier
-                    .clip(CircleShape)
-                    .size(40.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "What's new?",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                    navController?.navigate("create_post") ?: run {
-                        Toast.makeText(context, "Cannot navigate to create post", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-        }
-        Divider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        when{
-            viewState.loading -> {
-                CircularProgressIndicator(
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    model = (RetrofitClient.MEDIA_BASE_URL + viewModel.currentUser?.profilePicture),
+                    contentDescription = "User avatar",
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentSize(Alignment.Center)
+                        .clip(CircleShape)
+                        .size(40.dp)
                 )
-            }
-            viewState.error != null -> {
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Error: ${viewState.error}",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.bodyLarge
+                    text = "What's new?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable {
+                            navController?.navigate("create_post") ?: run {
+                                Toast.makeText(context, "Cannot navigate to create post", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                 )
             }
-            else -> {
-                // Hiển thị danh sách bài đăng
-                LazyColumn {
-                    items(posts) { post ->
-                        PostItem(
-                            post = post,
-                            viewModel = viewModel,
-                            navController = navController,
-                            activityViewModel = activityViewModel
-                        )
+            Divider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            when{
+                viewState.loading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentSize(Alignment.Center)
+                    )
+                }
+                viewState.error != null -> {
+                    Text(
+                        text = "Error: ${viewState.error}",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+                else -> {
+                    // Hiển thị danh sách bài đăng
+                    LazyColumn {
+                        items(posts) { post ->
+                            PostItem(
+                                post = post,
+                                viewModel = viewModel,
+                                navController = navController,
+                                activityViewModel = activityViewModel
+                            )
+                        }
                     }
                 }
             }
-        }
 
+        }
     }
 }
 

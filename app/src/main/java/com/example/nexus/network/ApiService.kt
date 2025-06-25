@@ -6,6 +6,7 @@ import com.example.nexus.ui.model.CreateCommentRequest
 import com.example.nexus.ui.model.CreateCommentResponse
 import com.example.nexus.ui.model.CreateNotificationRequest
 import com.example.nexus.ui.model.CreatePostRequest
+import com.example.nexus.ui.model.CreateUserRequest
 import com.example.nexus.ui.model.Like
 import com.example.nexus.ui.model.NotificationResponse
 import com.example.nexus.ui.model.Post
@@ -182,4 +183,8 @@ interface ApiService {
     suspend fun createMention(
         @Body request: CreateMentionRequest
     ): ApiResponse<Any>
+    @POST("yapping/api/users/register")
+    suspend fun registerUser(
+        @Body request: CreateUserRequest
+    ): ApiResponse<UserResponse>
 }

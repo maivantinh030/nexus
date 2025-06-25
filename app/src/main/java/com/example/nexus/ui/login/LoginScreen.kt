@@ -2,7 +2,9 @@ package com.example.nexus.ui.login
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,13 +12,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -28,6 +34,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -39,115 +47,120 @@ import com.example.nexus.network.RetrofitClient
 import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(navController: NavController,  authManager: AuthManager){
-    var email by remember { mutableStateOf("") }
+fun LoginScreen(
+    navController: NavController,
+    viewModel: LoginViewModel){
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    Column(
-        modifier = Modifier.fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+                )
+            )
 
     ){
-        Text(
-            text = "Login to Nexus",
-            style = MaterialTheme.typography.headlineMedium
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        TextField(
-            value = email,
-            onValueChange = {email = it},
-            label ={Text("Username")},
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        TextField(
-            value = password,
-            onValueChange = {password = it},
-            label ={Text("Password")},
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                    )
-                }
-            }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = {
-                scope.launch {
-                    isLoading = true
-                    errorMessage = null
-                    try {
-                        Log.d("LoginScreen", "Starting login with email: $email")
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
 
-                        val response = RetrofitClient.apiService.login(LoginRequest(email, password))
-
-                        // Debug response - truy cập trực tiếp các field
-                        Log.d("LoginScreen", "Response received:")
-                        Log.d("LoginScreen", "Access token: ${response.access_token.take(20)}...")
-                        Log.d("LoginScreen", "User ID: ${response.user_id}")
-                        Log.d("LoginScreen", "Roles: ${response.roles}")
-
-                        // Lưu tokens
-                        authManager.saveTokens(response.access_token, response.refresh_token,response.user_id)
-
-                        // Verify tokens were saved
-                        val savedToken = authManager.getAccessToken()
-                        Log.d("LoginScreen", "Token saved: ${savedToken?.take(20)}...")
-
-                        // Navigate to home
-                        navController.navigate("timeline") {
-                            popUpTo("login") { inclusive = true }
-                        }
-
-                        Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Log.e("LoginScreen", "Exception during login", e)
-
-                        // Chi tiết lỗi
-                        when (e) {
-                            is java.net.ConnectException -> {
-                                errorMessage = "Không thể kết nối đến server. Kiểm tra IP và port."
-                            }
-                            is java.net.SocketTimeoutException -> {
-                                errorMessage = "Timeout. Server phản hồi quá chậm."
-                            }
-                            is retrofit2.HttpException -> {
-                                errorMessage = when (e.code()) {
-                                    404 -> "API endpoint không tồn tại. Kiểm tra đường dẫn API."
-                                    401 -> "Sai tên đăng nhập hoặc mật khẩu."
-                                    500 -> "Lỗi server internal."
-                                    else -> "HTTP Error: ${e.code()} - ${e.message()}"
-                                }
-                                Log.e("LoginScreen", "HTTP Error body: ${e.response()?.errorBody()?.string()}")
-                            }
-                            else -> {
-                                errorMessage = "Lỗi không xác định: ${e.javaClass.simpleName}"
-                            }
-                        }
-                    } finally {
-                        isLoading = false
+        ){
+            Text(
+                text = "Login to Nexus",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Spacer(modifier = Modifier.height(26.dp))
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Username") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White.copy(alpha = 0.8f),
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.6f),
+                    focusedBorderColor = Color(0xFF7BB3D3),
+                    unfocusedBorderColor = Color.Transparent
+                )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White.copy(alpha = 0.8f),
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.6f),
+                    focusedBorderColor = Color(0xFF7BB3D3),
+                    unfocusedBorderColor = Color.Transparent
+                ),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                        )
                     }
                 }
+            )
 
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = {
+                scope.launch {
+                    viewModel.signIn (
+                        username = username,
+                        password = password,
+                        onResult = { success, message ->
+                            isLoading = false
+                            if (success) {
+                                // Navigate to the main screen or dashboard
+                                navController.navigate("timeline") {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                            } else {
+                                errorMessage = message ?: "Login failed"
+                                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
 
             },
-            modifier = Modifier.width(180.dp)) {
-            Text("Sign in")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = { navController.navigate("signup") }) {
-            Text("Don't have an account? Sign Up")
-        }
+                modifier = Modifier.width(180.dp).height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF7BB3D3)
+                )
 
+            )
+            {
+                Text("Sign in")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = { navController.navigate("signup") }) {
+                Text("Don't have an account? Sign Up")
+            }
+
+        }
     }
 }
+
+

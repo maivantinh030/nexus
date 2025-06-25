@@ -12,7 +12,6 @@ data class Post(
     val repostCount: Int = 0,
     val quoteCount: Int = 0,
     var isLiked: Boolean = false, // Không có trong database, dùng để mô phỏng trạng thái Like
-//    val comments: List<Comment> = emptyList(),
     val replies: List<Post> = emptyList(),
     val media: List<Media>? = null,
     val createdAt: String? = null, // Lưu dạng String vì API thường trả về định dạng ISO

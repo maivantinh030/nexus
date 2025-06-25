@@ -21,7 +21,6 @@ import com.example.nexus.ui.model.CreateCommentRequest
 import com.example.nexus.ui.model.CreatePostRequest
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
-import com.example.nexus.utils.FileUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

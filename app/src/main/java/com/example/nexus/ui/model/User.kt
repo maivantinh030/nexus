@@ -19,3 +19,11 @@ data class UserResponse(
     val message: String? = null,
     val data: User
 )
+data class CreateUserRequest(
+    val username: String,
+    val email: String,
+    val fullName: String,
+    val password: String,
+    val bio: String? = null,
+    val profilePicture: String? = null
+)

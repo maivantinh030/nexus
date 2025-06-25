@@ -46,6 +46,7 @@ import com.example.nexus.ui.UserFollowScreen
 import com.example.nexus.ui.activity.ActivityScreen
 import com.example.nexus.ui.activity.ActivityViewModel
 import com.example.nexus.ui.login.LoginScreen
+import com.example.nexus.ui.login.LoginViewModel
 import com.example.nexus.ui.login.SignUpScreen
 import com.example.nexus.ui.search.SearchViewModel
 import com.example.nexus.ui.timeline.TimelineViewModel
@@ -58,6 +59,10 @@ fun AppNavGraph(viewModel: TimelineViewModel = TimelineViewModel(authManager = A
     val currentRoute = navBackStackEntry?.destination?.route
     val searchViewModel = SearchViewModel(viewModel)
     val activityViewModel = ActivityViewModel()
+    val loginViewModel = LoginViewModel(
+        authManager = AuthManager(LocalContext.current)
+
+    )
     val context = LocalContext.current
     val authManager = remember { AuthManager(context) }
 
@@ -118,10 +123,12 @@ fun AppNavGraph(viewModel: TimelineViewModel = TimelineViewModel(authManager = A
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("login") {
-                LoginScreen(navController = navController, authManager = authManager) // Truyền authManager vào LoginScreen
+                LoginScreen(navController = navController,
+                    viewModel = loginViewModel) // Truyền authManager vào LoginScreen
             }
             composable("signup") {
-                SignUpScreen(navController = navController)
+                SignUpScreen(navController = navController,
+                    viewModel = loginViewModel)
             }
             composable("timeline") {
                 TimelineScreen( viewModel = viewModel,
