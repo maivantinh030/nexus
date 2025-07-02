@@ -27,3 +27,10 @@ data class CreateUserRequest(
     val bio: String? = null,
     val profilePicture: String? = null
 )
+data class PatchUserDTO(
+    val username: String? = null,
+    val email: String? = null,
+    val fullName: String? = null,
+    val bio: String? = null,
+    val profilePicture: String? = null
+)

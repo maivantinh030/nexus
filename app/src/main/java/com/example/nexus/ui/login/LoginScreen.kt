@@ -75,14 +75,14 @@ fun LoginScreen(
 
         ){
             Text(
-                text = "Login to Nexus",
+                text = "Đăng nhập",
                 style = MaterialTheme.typography.headlineMedium
             )
             Spacer(modifier = Modifier.height(26.dp))
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Username") },
+                label = { Text("Tài khoản") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
@@ -99,7 +99,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text("Mật khẩu") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
@@ -131,13 +131,13 @@ fun LoginScreen(
                         onResult = { success, message ->
                             isLoading = false
                             if (success) {
-                                // Navigate to the main screen or dashboard
+                                // Navigate to the timeline screen or dashboard
                                 navController.navigate("timeline") {
                                     popUpTo("login") { inclusive = true }
                                 }
                             } else {
                                 errorMessage = message ?: "Login failed"
-                                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Tài khoản hoặc mật khẩu sai", Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
@@ -152,11 +152,11 @@ fun LoginScreen(
 
             )
             {
-                Text("Sign in")
+                Text("Đăng nhập")
             }
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(onClick = { navController.navigate("signup") }) {
-                Text("Don't have an account? Sign Up")
+                Text("Bạn không có tài khoản? Đăng ký ngay")
             }
 
         }

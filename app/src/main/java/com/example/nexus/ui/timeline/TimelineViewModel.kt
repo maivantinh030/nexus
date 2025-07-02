@@ -7,7 +7,6 @@ import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.Log
@@ -15,11 +14,18 @@ import androidx.media3.common.util.UnstableApi
 import com.example.nexus.network.AuthManager
 import com.example.nexus.network.CreateMentionRequest
 import com.example.nexus.network.RetrofitClient
+import com.example.nexus.network.RetrofitClient.apiService
 import com.example.nexus.ui.activity.ActivityViewModel
+import com.example.nexus.ui.activity.FCMManager
+import com.example.nexus.ui.model.ApiResponse
 import com.example.nexus.ui.model.Comment
 import com.example.nexus.ui.model.CreateCommentRequest
 import com.example.nexus.ui.model.CreatePostRequest
+import com.example.nexus.ui.model.CreateReportRequest
+import com.example.nexus.ui.model.PatchUserDTO
 import com.example.nexus.ui.model.Post
+import com.example.nexus.ui.model.ReportReason
+import com.example.nexus.ui.model.ReportTargetType
 import com.example.nexus.ui.model.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,15 +33,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
 
-class TimelineViewModel(private val authManager: AuthManager,private val context: Context) : ViewModel() {
+class TimelineViewModel(val authManager: AuthManager, private val context: Context) : ViewModel() {
 
     private val _postsState = mutableStateOf(PostState())
     val postsState: State<PostState> = _postsState
@@ -47,24 +47,50 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
     val userCache: StateFlow<Map<Long, User>> = _userCache.asStateFlow()
     private val _postCache = MutableStateFlow<Map<Long, Post>>(emptyMap())
     val postCache: StateFlow<Map<Long, Post>> = _postCache.asStateFlow()
-    val activityViewModel = ActivityViewModel()
+    val activityViewModel = ActivityViewModel(
+        apiService = RetrofitClient.apiService,
+        fcmManager = FCMManager(context)
+    )
     // Chuyển sang MutableStateFlow để quản lý bất đồng bộ
     private val _listUserFollow = MutableStateFlow<List<User>>(emptyList())
     val listUserFollow: StateFlow<List<User>> = _listUserFollow.asStateFlow()
-
     private val _listUserFollowing = MutableStateFlow<List<User>>(emptyList())
     val listUserFollowing: StateFlow<List<User>> = _listUserFollowing.asStateFlow()
-    @RequiresApi(Build.VERSION_CODES.O)
-    val currentTime = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-    init {
-        // Lấy dữ liệu bài đăng từ API khi ViewModel được khởi tạo
-        fetchPosts()
-        fetchUserFollowersAndFollowing()
-    }
-    private fun fetchPosts(page: Int = 0){
-        viewModelScope.launch {
+
+    @OptIn(UnstableApi::class)
+    private suspend fun ensureValidToken(): Boolean {
+        return try {
             val token = authManager.getAccessToken()
-            if (token == null) {
+            if (token.isNullOrBlank()) {
+                // Try to refresh token
+                authManager.refreshToken()
+            } else {
+                true
+            }
+        } catch (e: Exception) {
+            Log.e("TimelineViewModel", "Error ensuring valid token", e)
+            false
+        }
+    }
+    init {
+        // ✅ Only fetch posts if user is authenticated
+        if (authManager.isUserLoggedIn()) {
+            try {
+                fetchPosts()
+                fetchUserFollowersAndFollowing()
+            } catch (e: Exception) {
+
+            }
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    fun fetchPosts(page: Int = 0){
+        viewModelScope.launch {
+            Log.d("TimelineViewModel", "=== FETCH POSTS DEBUG ===")
+            Log.d("TimelineViewModel", "User logged in: ${authManager.isUserLoggedIn()}")
+            Log.d("TimelineViewModel", "Current user ID: ${authManager.getUserId()}")
+            if (!ensureValidToken()) {
                 _postsState.value = _postsState.value.copy(
                     loading = false,
                     loadingMore = false,
@@ -75,7 +101,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             try {
                 val response = RetrofitClient.apiService.getPosts(page = page)
                 if(response.success){
-                    val posts = response.data.content
+                    Log.d("TimelineViewModel", "Processing ${response.data.content.size} posts")
                     _postsState.value = PostState(
                         loading = false,
                         posts = if (page == 0) response.data.content else _postsState.value.posts + response.data.content,
@@ -86,14 +112,17 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
                     )
                     // Cache users trước
                     response.data.content.forEach { post ->
+                        Log.d("TimelineViewModel", "Processing post: ${post.id} by user: ${post.user?.username}")
                         post.isLiked =checkLike("POST",post.id?: 0)
-                        post.user?.id?.let { userId ->
-                            _userCache.value = _userCache.value + (userId to post.user)
-                        }
+                        saveUserToCache(post.user)
+
                         _postCache.value = (_postCache.value + (post.id to post)) as Map<Long, Post>
                     }
+                    Log.d("TimelineViewModel", "After processing - UserCache size: ${_userCache.value.size}")
+                    Log.d("TimelineViewModel", "After processing - PostCache size: ${_postCache.value.size}")
                 }
                 else{
+                    Log.e("TimelineViewModel", "API failed: ${response.message}")
                     _postsState.value = _postsState.value.copy(
                         loading = false,
                         loadingMore = false,
@@ -116,6 +145,27 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
         }
     }
 
+    fun refreshPosts() {
+        viewModelScope.launch {
+            try {
+                // Reset state
+                _postsState.value = _postsState.value.copy(
+                    loading = true,
+                    error = null
+                )
+                // Clear cache nếu cần
+                _postCache.value = emptyMap()
+                // Fetch posts từ page 0
+                fetchPosts(page = 0)
+
+            } catch (e: Exception) {
+                _postsState.value = _postsState.value.copy(
+                    loading = false,
+                    error = e.message ?: "Lỗi khi tải lại"
+                )
+            }
+        }
+    }
 
     fun fetchPostsUser(userId: Long) {
         viewModelScope.launch {
@@ -150,6 +200,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
     // Giả sử ID của người dùng hiện tại (lấy từ SharedPreferences hoặc Auth sau này)
     val currentUserId: Long?
         get() = authManager.getUserId()
+
     val currentUser : User?
         get() = currentUserId?.let { _userCache.value[it] }
     // Lấy danh sách người dùng theo dõi và đang theo dõi của người dùng hiện tại
@@ -173,11 +224,10 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
         }
     }
     suspend fun getUserById(userId: Long): User? {
-        _userCache.value[userId]?.let { return it }
         return try {
-            val response = RetrofitClient.apiService.getUserById(userId)
+            val response = apiService.getUserById(userId)
             if (response.success) {
-                _userCache.value = _userCache.value + (userId to response.data)
+                saveUserToCache(response.data)
                 response.data
             } else {
                 null
@@ -249,6 +299,11 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             false
         }
     }
+    private fun saveUserToCache(user: User?) {
+        user?.id?.let { userId ->
+            _userCache.value = _userCache.value + (userId to user)
+        }
+    }
     suspend fun getPostById(postId: Long): Post? {
         _postCache.value[postId]?.let { return it }
         return try {
@@ -280,7 +335,6 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             emptyList()
         }
     }
-
     suspend fun getFollowing(userId: Long): List<User> {
         return try {
             val response = RetrofitClient.apiService.getFollowing(userId)
@@ -341,13 +395,6 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
         )
     )
     val follows: StateFlow<List<Pair<Long, Long>>> = _follows.asStateFlow()
-
-
-    // Kiểm tra xem người dùng có id là userId1 có follow người dùng có id là userId2 không
-    fun isFollowing(userId1: Long,userId2: Long): Boolean {
-            return _follows.value.any { it.first == userId1 && it.second == userId2 }
-        }
-
     // Theo dõi một người dùng
     suspend fun followUser(userId: Long) {
         currentUserId.let{
@@ -360,7 +407,6 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             }
         }
     }
-
     // Bỏ theo dõi một người dùng
     suspend fun unfollowUser(userId: Long) {
         currentUserId.let{
@@ -383,14 +429,6 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
                         _postCache.value = _postCache.value + (postId to p)
                     }
                     _currentPost.value = _currentPost.value?.copy(isLiked = true, likeCount = (_currentPost.value!!.likeCount?.plus(1)))
-                    activityViewModel.addNotification(
-                        userId = _postCache.value[postId]?.user?.id ?: 0,
-                        actorId = currentUserId ?: 0,
-                        type = "LIKE_POST",
-                        targetType = "POST",
-                        targetId = postId,
-                        targetOwnerId = _postCache.value[postId]?.user?.id ?: 0
-                    )
                 }
                 else{
                     _postsState.value = _postsState.value.copy(error = response.message ?: "Failed to like post")
@@ -456,71 +494,156 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             }
         }
     }
-    // Thêm bài đăng mới
+
     @OptIn(UnstableApi::class)
     @RequiresApi(Build.VERSION_CODES.O)
-        fun addPost(content: String, visibility: String = "PUBLIC", parentPostId: Long? = null, imageUris: List<Uri>) {
-            viewModelScope.launch {
-                try {
-                    if(imageUris.isEmpty()){
-                        val fileParts = mutableListOf<MultipartBody.Part>()
-                        imageUris.forEachIndexed { index, uri ->
-                            val file = uriToFile(context, uri, "image_$index")
-                            if (file != null) {
-                                val mimeType = getMimeType(file.name)
-                                val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
-                                // Quan trọng: Tất cả files phải có cùng tên parameter "files"
-                                val part = MultipartBody.Part.createFormData("files", file.name, requestFile)
-                                fileParts.add(part)
-                            }
-                        }
-                        val contentBody = content.toRequestBody("text/plain".toMediaTypeOrNull())
-                        val visibilityBody = visibility.toRequestBody("text/plain".toMediaTypeOrNull())
-                        val parentPostIdBody = parentPostId?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                        val response = RetrofitClient.apiService.createPostWithMedia(
-                            content = contentBody,
-                            visibility = visibilityBody,
-                            parentPostId = parentPostIdBody,
-                            files = if (fileParts.isNotEmpty()) fileParts else null
-                        )
-                        if (response.success) {
-                            fetchPosts(0)
-                            Log.d("TimelineViewModel", "Post added successfully: ${response.data}")
-                        } else {
-                            _postsState.value = _postsState.value.copy(
-                                loading = false,
-                                error = response.message ?: "Failed to add post"
-                            )
-                            Log.e("TimelineViewModel", "Failed to add post: ${response.message}")
-                        }
-                    }
-                    else{
-                        val createPostRequest = CreatePostRequest(
-                            content = content,
-                            visibility = visibility,
-                            parentPostId = parentPostId
-                        )
-                        val response = RetrofitClient.apiService.createPost(createPostRequest)
-                        if (response.success) {
-                            fetchPosts(0)
-                            Log.d("TimelineViewModel", "Post added successfully: ${response.data}")
-                        } else {
-                            _postsState.value = _postsState.value.copy(
-                                loading = false,
-                                error = response.message ?: "Failed to add post"
-                            )
-                            Log.e("TimelineViewModel", "Failed to add post: ${response.message}")
-                        }
-                    }
+    fun addPost(
+        content: String,
+        visibility: String = "PUBLIC",
+        parentPostId: Long? = null,
+        mediaUris: List<Uri> = emptyList() // Đổi tên từ imageUris thành mediaUris
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = if (mediaUris.isNotEmpty()) {
+                    createPostWithMedia(content, visibility, parentPostId, mediaUris)
+                } else {
+                    createPostWithoutMedia(content, visibility, parentPostId)
+                }
+                handlePostResponse(response)
 
-                } catch (e: Exception) {
-                    _postsState.value = _postsState.value.copy(
-                        loading = false,
-                        error = e.message ?: "Unknown error"
+            } catch (e: Exception) {
+                handleError(e)
+            }
+        }
+    }
+    // Helper: Xử lý response
+    @OptIn(UnstableApi::class)
+    private fun handlePostResponse(response: ApiResponse<Post>) {
+        if (response.success) {
+            fetchPosts(0)
+            Log.d("TimelineViewModel", "Post created successfully")
+        } else {
+            _postsState.value = _postsState.value.copy(
+                loading = false,
+                error = response.message ?: "Failed to create post"
+            )
+        }
+    }
+
+    // Helper: Xử lý error
+    @OptIn(UnstableApi::class)
+    private fun handleError(e: Exception) {
+        _postsState.value = _postsState.value.copy(
+            loading = false,
+            error = e.message ?: "Unknown error"
+        )
+        Log.e("TimelineViewModel", "Error creating post: ${e.message}")
+    }
+    // Tách thành các helper methods
+    @OptIn(UnstableApi::class)
+    private suspend fun createPostWithMedia(
+        content: String,
+        visibility: String,
+        parentPostId: Long?,
+        mediaUris: List<Uri>
+    ): ApiResponse<Post> {
+
+        Log.d("MediaUpload", "Creating post with ${mediaUris.size} media files")
+
+        val mediaParts = mediaUris.mapIndexedNotNull { index, uri ->
+            createMediaPart(uri, "files", context)
+        }
+
+        Log.d("MediaUpload", "Successfully created ${mediaParts.size}/${mediaUris.size} parts")
+
+        // ✅ Log request parameters
+        Log.d("API_REQUEST", "=== API Request Debug ===")
+        Log.d("API_REQUEST", "Content: '$content'")
+        Log.d("API_REQUEST", "Visibility: '$visibility'")
+        Log.d("API_REQUEST", "ParentPostId: $parentPostId")
+        Log.d("API_REQUEST", "Media parts count: ${mediaParts.size}")
+
+        try {
+            val response = RetrofitClient.apiService.createPostWithMedia(
+                content = content.toRequestBody("text/plain".toMediaTypeOrNull()),
+                visibility = visibility.toRequestBody("text/plain".toMediaTypeOrNull()),
+                parentPostId = parentPostId?.toString()
+                    ?.toRequestBody("text/plain".toMediaTypeOrNull()),
+                files = mediaParts.ifEmpty { null }
+            )
+
+            // ✅ Log detailed response
+            Log.d("API_RESPONSE", "=== API Response Debug ===")
+            Log.d("API_RESPONSE", "Success: ${response.success}")
+            Log.d("API_RESPONSE", "Message: '${response.message}'")
+            Log.d("API_RESPONSE", "Data: ${response.data}")
+
+            // ✅ Log post details if created
+            response.data?.let { post ->
+                Log.d("API_RESPONSE", "Created Post ID: ${post.id}")
+                Log.d("API_RESPONSE", "Post Content: '${post.content}'")
+                Log.d("API_RESPONSE", "Post Media Count: ${post.media?.size ?: 0}")
+
+                post.media?.forEachIndexed { index, media ->
+                    Log.d(
+                        "API_RESPONSE",
+                        "Media $index: ${media.mediaUrl}, Type: ${media.mediaType}"
                     )
                 }
             }
+
+            return response
+
+        } catch (e: Exception) {
+            Log.e("API_ERROR", "❌ API call failed", e)
+            Log.e("API_ERROR", "Exception type: ${e.javaClass.simpleName}")
+            Log.e("API_ERROR", "Exception message: ${e.message}")
+            throw e
         }
+    }
+
+    private suspend fun createPostWithoutMedia(
+        content: String,
+        visibility: String,
+        parentPostId: Long?
+    ): ApiResponse<Post> {
+        return RetrofitClient.apiService.createPost(
+            CreatePostRequest(content,"TEXT", visibility, parentPostId)
+        )
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun sharePost(originalPostId: Long, shareContent: String = "") {
+        viewModelScope.launch {
+            try {
+                // Sử dụng addPost có sẵn với parentPostId và visibility mặc định PUBLIC
+                addPost(
+                    content = shareContent,
+                    visibility = "PUBLIC", // Mặc định PUBLIC
+                    parentPostId = originalPostId, // Set parentPostId = ID bài được share
+                    mediaUris = emptyList() // Không có media khi share
+                )
+
+
+                // Tạo thông báo
+                val originalPost = _postCache.value[originalPostId]
+                activityViewModel.addNotification(
+                    userId = originalPost?.user?.id ?: 0,
+                    actorId = currentUserId ?: 0,
+                    type = "SHARE_POST",
+                    targetType = "POST",
+                    targetId = originalPostId,
+                    targetOwnerId = originalPost?.user?.id ?: 0
+                )
+
+            } catch (e: Exception) {
+                _postsState.value = _postsState.value.copy(
+                    error = e.message ?: "Lỗi khi chia sẻ bài đăng"
+                )
+            }
+        }
+    }
     // Repost bài đăng
     fun repost(post: Post) {
 //        val repost = post.copy(
@@ -531,6 +654,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
 //        )
 //        _posts.value = listOf(repost) + _posts.value
     }
+
     fun replyPost(parentPostId: Long, content: String) {
 //        _currentPost.value?.let { currentPost ->
 //            val newReply = Post(
@@ -602,7 +726,7 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
                 )
                 val response = RetrofitClient.apiService.createComment(request)
                 if (response.success) {
-                    val newComment =  response.data
+                    val newComment = response.data
                     _commentState.value = if (parentCommentId == null) {
                         _commentState.value.copy(
                             comments = (listOf(newComment) + _commentState.value.comments) as List<Comment>,
@@ -636,46 +760,172 @@ class TimelineViewModel(private val authManager: AuthManager,private val context
             }
         }
     }
+
     data class PostState(
-    val loading: Boolean = true,
-    val loadingMore: Boolean = false,
-    val posts: List<Post> = emptyList(),
-    val currentPage: Int = 0,
-    val last: Boolean = false,
-    val error: String? = null
-)
+        val loading: Boolean = true,
+        val loadingMore: Boolean = false,
+        val posts: List<Post> = emptyList(),
+        val currentPage: Int = 0,
+        val last: Boolean = false,
+        val error: String? = null
+    )
+
     data class CommentState(
         val loading: Boolean = true,
         val comments: List<Comment> = emptyList(),
         val error: String? = null
     )
+
+    @OptIn(UnstableApi::class)
+    suspend fun updateProfile(
+        fullName: String,
+        bio: String,
+        email: String,
+        profileImageUri: Uri? = null
+    ): Boolean {
+        return try {
+            // Nếu có ảnh mới, upload ảnh trước
+            if (profileImageUri != null) {
+                val imageUploadSuccess = uploadProfileImage(profileImageUri)
+                if (!imageUploadSuccess) {
+                    return false
+                }
+            }
+
+            // Cập nhật thông tin profile
+            val patchUserDTO = PatchUserDTO(
+                fullName = fullName,
+                bio = bio,
+                email = email
+            )
+
+            val response = RetrofitClient.apiService.updateCurrentUser(patchUserDTO)
+
+            if (response.success) {
+                // Cập nhật cache
+                currentUserId?.let { userId ->
+                    saveUserToCache(getUserById(userId))
+                }
+                true
+            } else {
+                Log.e("UpdateProfile", "Failed to update profile: ${response.message}")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("UpdateProfile", "Error updating profile", e)
+            false
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private suspend fun uploadProfileImage(imageUri: Uri): Boolean {
+        return try {
+            val imagePart = createMediaPart(imageUri, "file", context)
+            if (imagePart == null) {
+                Log.e("ProfileImageUpload", "Failed to create image part")
+                return false
+            }
+
+            val response = RetrofitClient.apiService.updateProfilePicture(imagePart)
+
+            if (response.success) {
+                // Cập nhật cache với URL ảnh mới
+                currentUserId?.let { userId ->
+                    val currentUser = _userCache.value[userId]
+                    currentUser?.let { user ->
+                        val updatedUser = user.copy(profilePicture = response.data?.profilePicture)
+                        saveUserToCache(updatedUser)
+                    }
+                }
+                true
+            } else {
+                Log.e("ProfileImageUpload", "Failed to upload image: ${response.message}")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("ProfileImageUpload", "Error uploading image", e)
+            false
+        }
+    }
+    // Thêm function reportPost
+    @OptIn(UnstableApi::class)
+    suspend fun reportPost(
+        postId: Long,
+        reason: ReportReason,
+        description: String
+    ): Boolean {
+        return try {
+            val createReportRequest = CreateReportRequest(
+                targetType = ReportTargetType.POST,
+                targetId = postId,
+                reason = reason,
+                description = description.takeIf { it.isNotBlank() }
+            )
+
+            val response = RetrofitClient.apiService.createReport(createReportRequest)
+
+            if (response.success) {
+                Log.d("TimelineViewModel", "Report created successfully")
+                true
+            } else {
+                Log.e("TimelineViewModel", "Failed to create report: ${response.message}")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("TimelineViewModel", "Error reporting post", e)
+            false
+        }
+    }
 }
 
-private fun uriToFile(context: Context, uri: Uri, fileName: String): File? {
+// Helper: Tạo MultipartBody.Part từ URI mà không cần temp file
+@OptIn(UnstableApi::class)
+private fun createMediaPart(uri: Uri, filetype: String, context: Context): MultipartBody.Part? {
     return try {
-        val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-        val file = File(context.cacheDir, "$fileName.jpg")
-        val outputStream = FileOutputStream(file)
+        val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+        val extension = getExtensionFromMimeType(mimeType)
+        val timestamp = System.currentTimeMillis()
 
-        inputStream?.use { input ->
-            outputStream.use { output ->
-                input.copyTo(output)
-            }
-        }
-        file
+        // Tạo filename unique
+        val finalFileName = "upload_${timestamp}$extension"
+
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val bytes = inputStream.readBytes()
+        inputStream.close()
+
+        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+
+        MultipartBody.Part.createFormData(
+            filetype,
+            finalFileName, //
+            requestBody
+        )
     } catch (e: Exception) {
-        e.printStackTrace()
+        Log.e("MediaUpload", "Error: ${e.message}", e)
         null
     }
 }
-
-private fun getMimeType(fileName: String): String {
-    return when {
-        fileName.endsWith(".jpg", true) || fileName.endsWith(".jpeg", true) -> "image/jpeg"
-        fileName.endsWith(".png", true) -> "image/png"
-        fileName.endsWith(".gif", true) -> "image/gif"
-        fileName.endsWith(".mp4", true) -> "video/mp4"
-        fileName.endsWith(".mov", true) -> "video/quicktime"
-        else -> "application/octet-stream"
+// Helper: Extension từ MIME type
+private fun getExtensionFromMimeType(mimeType: String): String {
+    return when (mimeType) {
+        "image/jpeg" -> ".jpg"
+        "image/png" -> ".png"
+        "image/gif" -> ".gif"
+        "image/webp" -> ".webp"
+        "video/mp4" -> ".mp4"
+        "video/quicktime" -> ".mov"
+        "video/3gpp" -> ".3gp"
+        else -> ""
     }
 }
+
+//private fun getMimeType(fileName: String): String {
+//    return when {
+//        fileName.endsWith(".jpg", true) || fileName.endsWith(".jpeg", true) -> "image/jpeg"
+//        fileName.endsWith(".png", true) -> "image/png"
+//        fileName.endsWith(".gif", true) -> "image/gif"
+//        fileName.endsWith(".mp4", true) -> "video/mp4"
+//        fileName.endsWith(".mov", true) -> "video/quicktime"
+//        else -> "application/octet-stream"
+//    }
+//}

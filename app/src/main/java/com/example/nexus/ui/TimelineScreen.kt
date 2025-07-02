@@ -19,24 +19,34 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -46,7 +56,10 @@ import com.example.nexus.components.PostItem
 import com.example.nexus.network.RetrofitClient
 import com.example.nexus.ui.activity.ActivityViewModel
 import com.example.nexus.ui.timeline.TimelineViewModel
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
+@OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun TimelineScreen(
@@ -55,146 +68,196 @@ fun TimelineScreen(
     navController: NavController? = null
 ) {
     val viewState by viewModel.postsState
-
-    val follows by viewModel.follows.collectAsState()
     val context = LocalContext.current
-    var postContent by remember { mutableStateOf("") }
     val postMap by viewModel.postCache.collectAsState()
     val posts = postMap.values.toList()
 
-    val currentUserId = 1L // Giả sử đây là ID người dùng hiện tại
+    // ✅ States
+    var isRefreshing by remember { mutableStateOf(false) }
+    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
+    val lazyListState = rememberLazyListState()
 
-//    // Sử dụng remember với dependencies để tính toán lại khi posts hoặc follows thay đổi
-//    val filteredPosts = remember(posts, follows) {
-//        posts.filter { post ->
-//            val userId = post.user?.id
-//            userId == currentUserId || follows.any { it.first == currentUserId && it.second == userId }
-//        }
-//    }
+    // ✅ Simple infinite scroll với firstVisibleItemIndex
+    LaunchedEffect(lazyListState) {
+        snapshotFlow { lazyListState.firstVisibleItemIndex }.collect { firstIndex ->
+            val totalItems = posts.size
+            val shouldLoad = totalItems > 0 &&
+                    firstIndex >= (totalItems - 5) && // Load when 5 items left
+                    !viewState.loadingMore &&
+                    !viewState.last
+
+            if (shouldLoad) {
+                viewModel.loadMorePosts()
+            }
+        }
+    }
+
+    // ✅ Handle refresh
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            try {
+                viewModel.refreshPosts()
+                viewModel.fetchUserFollowersAndFollowing()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isRefreshing = false
+            }
+        }
+    }
 
     Box(
         modifier = Modifier.fillMaxSize()
             .background(
                 brush = Brush.linearGradient(
-                colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+                    colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+                )
             )
-            )
-    ){
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+    ) {
+        SwipeRefresh(
+            state = swipeRefreshState,
+            onRefresh = { isRefreshing = true },
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Compose UI để tạo bài đăng mới
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                AsyncImage(
-                    model = (RetrofitClient.MEDIA_BASE_URL + viewModel.currentUser?.profilePicture),
-                    contentDescription = "User avatar",
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .size(40.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "What's new?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable {
-                            navController?.navigate("create_post") ?: run {
-                                Toast.makeText(context, "Cannot navigate to create post", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                )
-            }
-            Divider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            when{
-                viewState.loading -> {
-                    CircularProgressIndicator(
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = (RetrofitClient.MEDIA_BASE_URL + viewModel.currentUser?.profilePicture),
+                        contentDescription = "User avatar",
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentSize(Alignment.Center)
+                            .clip(CircleShape)
+                            .size(40.dp)
                     )
-                }
-                viewState.error != null -> {
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Error: ${viewState.error}",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = MaterialTheme.typography.bodyLarge
+                        text = "Có gì mới?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                navController?.navigate("create_post")
+                            }
                     )
                 }
-                else -> {
-                    // Hiển thị danh sách bài đăng
-                    LazyColumn {
-                        items(posts) { post ->
-                            PostItem(
-                                post = post,
-                                viewModel = viewModel,
-                                navController = navController,
-                                activityViewModel = activityViewModel
+
+                Divider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Content
+                when {
+                    viewState.loading && posts.isEmpty() -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentSize(Alignment.Center)
+                        )
+                    }
+                    viewState.error != null && posts.isEmpty() -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Error: ${viewState.error}",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyLarge
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Kéo xuống để thử lại",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    posts.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Chưa có bài đăng nào\nKéo xuống để tải lại",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(
+                                items = posts,
+                                key = { post -> post.id ?: 0 } // ✅ Key for better performance
+                            ) { post ->
+                                PostItem(
+                                    post = post,
+                                    viewModel = viewModel,
+                                    navController = navController
+                                )
+                            }
+
+                            // Loading more indicator
+                            if (viewState.loadingMore) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Đang tải thêm...",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // End of list
+                            if (viewState.last && posts.isNotEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "🎉 Bạn đã xem hết bài đăng",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun TimelineScreenPreview() {
-    MaterialTheme {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            // Preview UI tạo bài đăng
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_avatar_placeholder),
-                    contentDescription = "User avatar",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "What's new?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Divider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Preview placeholder cho loading state
-            Text(
-                text = "Timeline posts will appear here...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }

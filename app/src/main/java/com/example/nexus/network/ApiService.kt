@@ -6,12 +6,15 @@ import com.example.nexus.ui.model.CreateCommentRequest
 import com.example.nexus.ui.model.CreateCommentResponse
 import com.example.nexus.ui.model.CreateNotificationRequest
 import com.example.nexus.ui.model.CreatePostRequest
+import com.example.nexus.ui.model.CreateReportRequest
 import com.example.nexus.ui.model.CreateUserRequest
 import com.example.nexus.ui.model.Like
 import com.example.nexus.ui.model.NotificationResponse
+import com.example.nexus.ui.model.PatchUserDTO
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.PostResponse
 import com.example.nexus.ui.model.PostResponseSingle
+import com.example.nexus.ui.model.User
 import com.example.nexus.ui.model.UserResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -44,7 +47,15 @@ data class AuthenticationResponse(
     val access_token: String,
     val refresh_token: String,
     val user_id: Long,
-    val roles: List<String> // Backend sử dụng Set nhưng JSON sẽ serialize thành array
+    val roles: List<String>
+)
+data class ErrorResponse(
+    val type: String?,
+    val title: String?,
+    val status: Int,
+    val detail: String?,
+    val instance: String?,
+    val errorCode: String?
 )
 interface ApiService {
 
@@ -117,6 +128,14 @@ interface ApiService {
         @Body request: LoginRequest
     ): AuthenticationResponse
 
+    @POST("yapping/api/auth/refresh")
+    suspend fun refreshToken(
+        @Body request: RefreshTokenRequest
+    ): AuthenticationResponse
+
+    @POST("yapping/api/auth/logout")
+    suspend fun logout(): ApiResponse<Any>
+
     @GET("yapping/api/likes/check")
     suspend fun hasUserLiked(
         @Query("userId") userId: Long,
@@ -157,7 +176,7 @@ interface ApiService {
         @Part("content") content: RequestBody,
         @Part("visibility") visibility: RequestBody,
         @Part("parentPostId") parentPostId: RequestBody?,
-        @Part files: List<MultipartBody.Part>?
+        @Part files: List<MultipartBody.Part>? //
     ): ApiResponse<Post>
 
     @POST("yapping/api/notifications")
@@ -187,4 +206,29 @@ interface ApiService {
     suspend fun registerUser(
         @Body request: CreateUserRequest
     ): ApiResponse<UserResponse>
+
+    @PATCH("yapping/api/users/me")
+    suspend fun updateCurrentUser(
+        @Body patchUserDTO: PatchUserDTO
+    ): ApiResponse<User>
+
+    @Multipart
+    @PATCH("yapping/api/users/me/profile-picture")
+    suspend fun updateProfilePicture(
+        @Part file: MultipartBody.Part
+    ): ApiResponse<User>
+
+    @POST("/yapping/api/fcm/token")
+    suspend fun updateFCMToken(
+        @Body request: Map<String, String>
+    ): ApiResponse<Any>
+
+    @DELETE("/yapping/api/fcm/token")
+    suspend fun removeFCMToken(): ApiResponse<Any>
+
+    // Trong ApiService
+    @POST("/yapping/api/reports")
+    suspend fun createReport(
+        @Body request: CreateReportRequest
+    ): ApiResponse<Any>
 }

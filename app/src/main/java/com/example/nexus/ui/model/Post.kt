@@ -16,7 +16,10 @@ data class Post(
     val media: List<Media>? = null,
     val createdAt: String? = null, // Lưu dạng String vì API thường trả về định dạng ISO
     val updatedAt: String? = null
-)
+){
+    // Helper function để check xem có phải bài share không
+    fun isSharedPost(): Boolean = parentPostId != null
+}
 
 data class Media(
     val id: Long?= null,

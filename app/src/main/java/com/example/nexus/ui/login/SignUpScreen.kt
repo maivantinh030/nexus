@@ -66,7 +66,7 @@ fun SignUpScreen(navController: NavController
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Sign Up for Nexus",
+                text = "Đăng ký tài khoản",
                 style = MaterialTheme.typography.headlineMedium
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -75,7 +75,7 @@ fun SignUpScreen(navController: NavController
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Username") },
+                label = { Text("Tên tài khoản") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(24.dp),
@@ -105,7 +105,7 @@ fun SignUpScreen(navController: NavController
             OutlinedTextField(
                 value = fullName,
                 onValueChange = { fullName = it },
-                label = { Text("Full Name") },
+                label = { Text("Họ và tên") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(24.dp),
@@ -120,10 +120,9 @@ fun SignUpScreen(navController: NavController
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text("Mật khẩu") },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.White.copy(alpha = 0.8f),
@@ -145,7 +144,7 @@ fun SignUpScreen(navController: NavController
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                label = { Text("Confirm Password") },
+                label = { Text("Xác nhận mật khẩu") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
@@ -172,14 +171,30 @@ fun SignUpScreen(navController: NavController
                     if (password == confirmPassword) {
                         viewModel.signUp(username, email, fullName, password) { success, message ->
                             if (success) {
-                                Toast.makeText(context, "Sign Up Successful!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
                                 navController.navigate("login")
                             } else {
-                                Toast.makeText(context, message ?: "Sign Up Failed", Toast.LENGTH_SHORT).show()
+                                var displayMessage = message
+                                if(displayMessage.equals("Username already exists")) {
+                                    displayMessage = "Tên tài khoản đã tồn tại"
+                                }
+                                if(displayMessage.equals("Email already exists")) {
+                                    displayMessage = "Email đã được sử dụng"
+                                }
+                                if((displayMessage?.contains("must be a well-formed email address") == true)) {
+                                    displayMessage = "Email không hợp lệ"
+                                }
+                                if((displayMessage?.contains("size must be between 8 and 255") == true)) {
+                                    displayMessage = "Mật khẩu quá ngắn"
+                                }
+                                if((displayMessage?.contains("size must be between 3 and 50") == true)) {
+                                    displayMessage = "Vui lòng nhập tên tài khoản từ 3 đến 50 ký tự"
+                                }
+                                Toast.makeText(context, displayMessage ?: "Sign Up Failed", Toast.LENGTH_SHORT).show()
                             }
                         }
                     } else {
-                        Toast.makeText(context, "Passwords do not match!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Mật khẩu và mật khẩu nhập lại không giống nhau!", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.width(180.dp).height(56.dp),
@@ -188,11 +203,11 @@ fun SignUpScreen(navController: NavController
                     containerColor = Color(0xFF7BB3D3)
                 )
             ) {
-                Text("Sign Up")
+                Text("Đăng ký")
             }
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(onClick = { navController.navigate("login") }) {
-                Text("Already have an account? Sign In")
+                Text("Đã có tài khoản? Đăng nhập")
             }
         }
     }

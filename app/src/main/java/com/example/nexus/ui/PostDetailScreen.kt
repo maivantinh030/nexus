@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -30,8 +29,10 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,12 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.Log
@@ -62,7 +63,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.nexus.R
-import com.example.nexus.components.VideoPlayer
+import com.example.nexus.components.PostItem
 import com.example.nexus.components.formatTimestamp
 import com.example.nexus.network.RetrofitClient
 import com.example.nexus.ui.activity.ActivityViewModel
@@ -71,11 +72,7 @@ import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
 import com.example.nexus.ui.timeline.TimelineViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -90,6 +87,7 @@ fun PostDetailScreen(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     var shouldRefresh by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(postId,shouldRefresh) {
         try {
@@ -170,7 +168,7 @@ fun PostDetailScreen(
     }
 }
 
-@OptIn(UnstableApi::class)
+@kotlin.OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun PostDetailContent(
@@ -224,80 +222,78 @@ fun PostDetailContent(
         animationSpec = tween(durationMillis = 300)
     )
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ){
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp)
-        ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = { navController?.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                    Text(
-                        text = "Nexus",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Spacer(modifier = Modifier.width(48.dp))
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            item {
-                PostDetailItem(
-                    post = post,
-                    onReplyClick = { parentId -> replyingToPostId = parentId },
-                    level = 0,
-                    viewModel = viewModel,
-                    activityViewModel = activityViewModel
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            if (post.replies.isNotEmpty()) {
-                items(post.replies) { reply ->
-                    PostDetailItem(
-                        post = reply,
-                        parentPostId = post.id,
-                        onReplyClick = { parentId -> replyingToPostId = parentId },
-                        level = 1,
-                        viewModel = viewModel,
-                        activityViewModel = activityViewModel
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-            }
-
-            items(viewState.comments) { comment ->
-                CommentItem(
-                    postId = post.id ?: 0,
-                    comment = comment,
-                    parentCommentId = null,
-                    onReplyClick = { commentId, username ->
-                        replyingToCommentId = commentId
-                        replyingToUsername = username
-                    },
-                    level = 0,
-                    viewModel = viewModel
-                )
-            }
-
-            // Reply to post section
-            if (replyingToPostId != null) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(
+            brush = Brush.linearGradient(
+                colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+            )
+        )){
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ){
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp)
+            ) {
                 item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(onClick = { navController?.navigateUp() }) {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                        Text(
+                            text = "Yapping",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Spacer(modifier = Modifier.width(48.dp))
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                    // Reply indicator
+                item {
+                    PostItem(
+                        post = post,
+                        viewModel = viewModel
+                    )
+                }
+                item {
+                    Divider(
+                        modifier = Modifier.padding(vertical = 16.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        thickness = 1.dp
+                    )
+                }
+                items(viewState.comments) { comment ->
+                    CommentItem(
+                        postId = post.id ?: 0,
+                        comment = comment,
+                        parentCommentId = null,
+                        onReplyClick = { commentId, username ->
+                            replyingToCommentId = commentId
+                            replyingToUsername = username
+                        },
+                        level = 0,
+                        viewModel = viewModel
+                    )
+                }
+
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(16.dp)
+            ) {
+                // Show reply indicator if replying to comment
+                if (replyingToCommentId != null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -305,15 +301,16 @@ fun PostDetailContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Replying to post",
+                            text = "Trả lời bình luận của ${replyingToUsername ?: "comment"}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         IconButton(
                             onClick = {
-                                replyingToPostId = null
-                                replyContent = ""
+                                replyingToCommentId = null
+                                replyingToUsername = null
+                                commentContent = ""
                             }
                         ) {
                             Icon(
@@ -323,183 +320,107 @@ fun PostDetailContent(
                             )
                         }
                     }
+                }
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth(0.65f)) {
                         OutlinedTextField(
-                            value = replyContent,
-                            onValueChange = { replyContent = it },
-                            label = { Text("Reply to post...") },
+                            value = commentContent,
+                            onValueChange = { newText->
+                                commentContent = newText
+
+                                val mentionIndex = newText.lastIndexOf("@")
+                                if(mentionIndex != -1){
+                                    val keyword = newText.substring(mentionIndex + 1)
+                                    suggestions = listUserFollowing.filter {
+                                        it.username.contains(keyword, ignoreCase = true)
+                                                || it.fullName?.contains(keyword, ignoreCase = true) == true
+                                    }.take(5)
+                                    expanded = suggestions.isNotEmpty()
+                                }
+                                else{
+                                    expanded = false
+                                }
+                            },
+                            label = {
+                                Text(
+                                    if (replyingToCommentId != null) "Trả lời bình luận của ${replyingToUsername ?: "comment"}..."
+                                    else "Thêm một bình luận ..."
+                                )
+                            },
                             modifier = Modifier
-                                .weight(1f)
+                                .width(250.dp)
                                 .height(56.dp),
                             textStyle = MaterialTheme.typography.bodyMedium
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (replyContent.isNotBlank()) {
-                                    scope.launch {
-                                        try {
-                                            viewModel.replyPost(replyingToPostId!!, replyContent)
-                                            Toast.makeText(context, "Reply added!", Toast.LENGTH_SHORT).show()
-                                            replyContent = ""
-                                            replyingToPostId = null
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Failed to add reply: ${e.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                } else {
-                                    Toast.makeText(context, "Please enter a reply", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier.height(48.dp)
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = {expanded = false },
+                            modifier = Modifier.fillMaxWidth(0.9f)
                         ) {
-                            Text("Post")
-                        }
-                    }
-                }
-            }
+                            suggestions.forEach {user ->
+                                DropdownMenuItem(
+                                    text ={
+                                        Row(verticalAlignment = Alignment.CenterVertically){
+                                            AsyncImage(
+                                                model = RetrofitClient.MEDIA_BASE_URL + user.profilePicture,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(24.dp).clip(CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(text = "${user.fullName} (@${user.username})")
+                                        }
+                                    },
+                                    onClick = {
+                                        val mentionIndex = commentContent.lastIndexOf('@')
+                                        commentContent = commentContent.substring(0, mentionIndex + 1) + user.fullName + " "
+                                        expanded = false
+                                        onUserTagged(user)
+                                        mentionUserId.value = user.id // Lưu ID người dùng được gắn thẻ
+                                    }
+                                )
 
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(16.dp)
-        ) {
-            // Show reply indicator if replying to comment
-            if (replyingToCommentId != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Replying to ${replyingToUsername ?: "comment"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
+                            }
+                        }
+
+                    }
+//                Spacer(modifier = Modifier.width(8.dp))
+                    Button(
                         onClick = {
-                            replyingToCommentId = null
-                            replyingToUsername = null
-                            commentContent = ""
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Cancel reply",
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
+                            if (commentContent.isNotBlank()) {
+                                scope.launch {
+                                    try {
+                                        if (replyingToCommentId != null) {
+                                            viewModel.addComment(post.id ?: 0, commentContent, replyingToCommentId)
+                                        } else {
+                                            viewModel.addComment(post.id ?: 0, commentContent)
+                                        }
+                                        viewModel.createMention(post.id, replyingToCommentId, mentionUserId.value ?: 0)
+                                        Log.d("PostDetailScreen", "Adding comment to post ${post.id} replying to comment $replyingToCommentId")
+                                        Toast.makeText(context, "Comment added!", Toast.LENGTH_SHORT).show()
+                                        commentContent = ""
+                                        replyingToCommentId = null
+                                        replyingToUsername = null
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.fillMaxWidth(0.8f)) {
-                    OutlinedTextField(
-                        value = commentContent,
-                        onValueChange = { newText->
-                            commentContent = newText
-
-                            val mentionIndex = newText.lastIndexOf("@")
-                            if(mentionIndex != -1){
-                                val keyword = newText.substring(mentionIndex + 1)
-                                suggestions = listUserFollowing.filter {
-                                    it.username.contains(keyword, ignoreCase = true)
-                                            || it.fullName?.contains(keyword, ignoreCase = true) == true
-                                }.take(5)
-                                expanded = suggestions.isNotEmpty()
-                            }
-                            else{
-                                expanded = false
+                                        // Refresh comments after adding
+                                        post.id?.let { postId ->
+                                            viewModel.getCommentsForPost(postId)
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Failed to add comment: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Vui lòng nhâp nội dung", Toast.LENGTH_SHORT).show()
                             }
                         },
-                        label = {
-                            Text(
-                                if (replyingToCommentId != null) "Replying to ${replyingToUsername ?: "comment"}..."
-                                else "Add a comment..."
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        textStyle = MaterialTheme.typography.bodyMedium
-                    )
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = {expanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
+                        modifier = Modifier.height(48.dp).fillMaxWidth()
                     ) {
-                        suggestions.forEach {user ->
-                            DropdownMenuItem(
-                                text ={
-                                    Row(verticalAlignment = Alignment.CenterVertically){
-                                        AsyncImage(
-                                            model = RetrofitClient.MEDIA_BASE_URL + user.profilePicture,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp).clip(CircleShape)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(text = "${user.fullName} (@${user.username})")
-                                    }
-                                },
-                                onClick = {
-                                    val mentionIndex = commentContent.lastIndexOf('@')
-                                    commentContent = commentContent.substring(0, mentionIndex + 1) + user.fullName + " "
-                                    expanded = false
-                                    onUserTagged(user)
-                                    mentionUserId.value = user.id // Lưu ID người dùng được gắn thẻ
-                                }
-                            )
-
-                        }
+                        Text("Bình luận")
                     }
-
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        if (commentContent.isNotBlank()) {
-                            scope.launch {
-                                try {
-                                    if (replyingToCommentId != null) {
-                                        viewModel.addComment(post.id ?: 0, commentContent, replyingToCommentId)
-                                    } else {
-                                        viewModel.addComment(post.id ?: 0, commentContent)
-                                    }
-                                    viewModel.createMention(post.id, replyingToCommentId, mentionUserId.value ?: 0)
-                                    Log.d("PostDetailScreen", "Adding comment to post ${post.id} replying to comment $replyingToCommentId")
-                                    Toast.makeText(context, "Comment added!", Toast.LENGTH_SHORT).show()
-                                    commentContent = ""
-                                    replyingToCommentId = null
-                                    replyingToUsername = null
-
-                                    // Refresh comments after adding
-                                    post.id?.let { postId ->
-                                        viewModel.getCommentsForPost(postId)
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Failed to add comment: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        } else {
-                            Toast.makeText(context, "Please enter a comment", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier.height(48.dp)
-                ) {
-                    Text("Post")
                 }
             }
         }
@@ -507,207 +428,217 @@ fun PostDetailContent(
 
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
-@Composable
-fun PostDetailItem(
-    post: Post,
-    parentPostId: Long? = null,
-    onReplyClick: (Long) -> Unit,
-    level: Int = 0,
-    viewModel: TimelineViewModel,
-    activityViewModel: ActivityViewModel? = null
-) {
-    var scale by remember(post.id) { mutableStateOf(1f) }
-    var triggerAnimation by remember(post.id) { mutableStateOf(false) }
-    var isLiked by remember(post.id) { mutableStateOf(post.isLiked) }
-    val scope = rememberCoroutineScope()
-
-    // Đồng bộ state local với post state
-    LaunchedEffect(post.isLiked) {
-        isLiked = post.isLiked
-    }
-
-    LaunchedEffect(triggerAnimation) {
-        if (triggerAnimation) {
-            scale = 1.5f
-            delay(150)
-            scale = 1f
-            triggerAnimation = false
-            // Fetch lại like count sau khi animation xong
-            viewModel.fetchLikeCount("POST",post.id ?: 0)
-        }
-    }
-
-    val likeColor by animateColorAsState(
-        targetValue = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(durationMillis = 300)
-    )
-
-    val animatedScale by animateFloatAsState(
-        targetValue = scale,
-        animationSpec = tween(durationMillis = 300)
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = (level * 16).dp)
-            .padding(vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            AsyncImage(
-                model = RetrofitClient.MEDIA_BASE_URL + post.user?.profilePicture,
-                contentDescription = "User avatar",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-                error = painterResource(R.drawable.ic_avatar_placeholder),
-                placeholder = painterResource(R.drawable.ic_avatar_placeholder)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = post.user?.username ?: "Unknown",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = formatTimestamp(post.createdAt),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = post.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                post.media?.let { mediaList ->
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(mediaList) { media ->
-                            val fullMediaUrl = RetrofitClient.MEDIA_BASE_URL + media.mediaUrl
-                            when (media.mediaType) {
-                                "IMAGE" -> {
-                                    AsyncImage(
-                                        model = fullMediaUrl,
-                                        contentDescription = "Post image",
-                                        modifier = Modifier
-                                            .height(200.dp)
-                                            .clip(MaterialTheme.shapes.medium),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                                "VIDEO" -> {
-                                    VideoPlayer(
-                                        videoUrl = fullMediaUrl,
-                                        modifier = Modifier
-                                            .width(280.dp)
-                                            .height(200.dp)
-                                    )
-                                }
-                                else -> {
-                                    Text(
-                                        text = "Unsupported media type: ${media.mediaType}",
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                Text(
-                    text = "${post.likeCount} likes",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    IconButton(onClick = {
-                        scope.launch {
-                            try {
-                                if (isLiked) {
-                                    // Unlike: cập nhật UI trước, sau đó gọi API
-                                    isLiked = false
-                                    post.isLiked = false
-                                    post.likeCount = (post.likeCount?.minus(1))?.coerceAtLeast(0)
-                                    viewModel.unLike("POST", post.id ?: 0)
-                                } else {
-                                    // Like: cập nhật UI trước, sau đó gọi API
-                                    isLiked = true
-                                    post.isLiked = true
-                                    post.likeCount = post.likeCount?.plus(1)
-                                    triggerAnimation = true
-                                    viewModel.LikePost(postId = post.id ?: 0)
-                                }
-                            } catch (e: Exception) {
-                                // Nếu API call thất bại, revert lại UI state
-                                isLiked = !isLiked
-                                post.isLiked = !post.isLiked
-                                // Revert likeCount
-                                if (isLiked) {
-                                    post.likeCount = (post.likeCount?.minus(1))?.coerceAtLeast(0)
-                                } else {
-                                    post.likeCount = post.likeCount?.plus(1)
-                                }
-                            }
-                        }
-                    }) {
-                        Icon(
-                            painter = painterResource(
-                                id = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart
-                            ),
-                            contentDescription = "Like",
-                            tint = likeColor,
-                            modifier = Modifier.scale(animatedScale)
-                        )
-                    }
-                    IconButton(onClick = { }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_comment),
-                            contentDescription = "Comment",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    IconButton(onClick = {
-                        viewModel.repost(post)
-                    }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_share),
-                            contentDescription = "Share",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    IconButton(onClick = {
-                        val replyToId = if (level == 0) post.id else parentPostId
-                        replyToId?.let { onReplyClick(it) }
-                    }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_comment),
-                            contentDescription = "Reply",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
+//@RequiresApi(Build.VERSION_CODES.O)
+//@Composable
+//fun PostDetailItem(
+//    post: Post,
+//    parentPostId: Long? = null,
+//    onReplyClick: (Long) -> Unit,
+//    level: Int = 0,
+//    viewModel: TimelineViewModel,
+//    activityViewModel: ActivityViewModel? = null
+//) {
+//    var scale by remember(post.id) { mutableStateOf(1f) }
+//    var triggerAnimation by remember(post.id) { mutableStateOf(false) }
+//    var isLiked by remember(post.id) { mutableStateOf(post.isLiked) }
+//    val scope = rememberCoroutineScope()
+//    var showShareDialog by remember { mutableStateOf(false) }
+//
+//    // Đồng bộ state local với post state
+//    LaunchedEffect(post.isLiked) {
+//        isLiked = post.isLiked
+//    }
+//
+//    LaunchedEffect(triggerAnimation) {
+//        if (triggerAnimation) {
+//            scale = 1.5f
+//            delay(150)
+//            scale = 1f
+//            triggerAnimation = false
+//            // Fetch lại like count sau khi animation xong
+//            viewModel.fetchLikeCount("POST",post.id ?: 0)
+//        }
+//    }
+//
+//    val likeColor by animateColorAsState(
+//        targetValue = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+//        animationSpec = tween(durationMillis = 300)
+//    )
+//
+//    val animatedScale by animateFloatAsState(
+//        targetValue = scale,
+//        animationSpec = tween(durationMillis = 300)
+//    )
+//
+//    Column(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(start = (level * 16).dp)
+//            .padding(vertical = 8.dp)
+//    ) {
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            verticalAlignment = Alignment.Top
+//        ) {
+//            AsyncImage(
+//                model = RetrofitClient.MEDIA_BASE_URL + post.user?.profilePicture,
+//                contentDescription = "User avatar",
+//                modifier = Modifier
+//                    .size(40.dp)
+//                    .clip(CircleShape),
+//                error = painterResource(R.drawable.ic_avatar_placeholder),
+//                placeholder = painterResource(R.drawable.ic_avatar_placeholder)
+//            )
+//            Spacer(modifier = Modifier.width(12.dp))
+//
+//            Column(modifier = Modifier.weight(1f)) {
+//                Row(verticalAlignment = Alignment.CenterVertically) {
+//                    Text(
+//                        text = post.user?.fullName ?: "Unknown",
+//                        style = MaterialTheme.typography.bodyLarge.copy(
+//                            fontWeight = FontWeight.Bold,
+//                            fontSize = 16.sp
+//                        )
+//                    )
+//                    Spacer(modifier = Modifier.width(8.dp))
+//                    Text(
+//                        text = formatTimestamp(post.createdAt),
+//                        style = MaterialTheme.typography.bodySmall.copy(
+//                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+//                        )
+//                    )
+//                }
+//                Spacer(modifier = Modifier.height(4.dp))
+//
+//                Text(
+//                    text = post.content,
+//                    style = MaterialTheme.typography.bodyMedium,
+//                    modifier = Modifier.padding(bottom = 8.dp)
+//                )
+//
+//                post.media?.let { mediaList ->
+//                    LazyRow(
+//                        modifier = Modifier.fillMaxWidth(),
+//                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+//                    ) {
+//                        items(mediaList) { media ->
+//                            val fullMediaUrl = RetrofitClient.MEDIA_BASE_URL + media.mediaUrl
+//                            when (media.mediaType) {
+//                                "IMAGE" -> {
+//                                    AsyncImage(
+//                                        model = fullMediaUrl,
+//                                        contentDescription = "Post image",
+//                                        modifier = Modifier
+//                                            .height(200.dp)
+//                                            .clip(MaterialTheme.shapes.medium),
+//                                        contentScale = ContentScale.Crop
+//                                    )
+//                                }
+//                                "VIDEO" -> {
+//                                    VideoPlayer(
+//                                        videoUrl = fullMediaUrl,
+//                                        modifier = Modifier
+//                                            .width(280.dp)
+//                                            .height(200.dp)
+//                                    )
+//                                }
+//                                else -> {
+//                                    Text(
+//                                        text = "Unsupported media type: ${media.mediaType}",
+//                                        color = MaterialTheme.colorScheme.error
+//                                    )
+//                                }
+//                            }
+//                        }
+//                    }
+//                    Spacer(modifier = Modifier.height(8.dp))
+//                }
+//
+//                Text(
+//                    text = "${post.likeCount} likes",
+//                    style = MaterialTheme.typography.bodySmall,
+//                    modifier = Modifier.padding(bottom = 4.dp)
+//                )
+//                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+//                    IconButton(onClick = {
+//                        scope.launch {
+//                            try {
+//                                if (isLiked) {
+//                                    // Unlike: cập nhật UI trước, sau đó gọi API
+//                                    isLiked = false
+//                                    post.isLiked = false
+//                                    post.likeCount = (post.likeCount?.minus(1))?.coerceAtLeast(0)
+//                                    viewModel.unLike("POST", post.id ?: 0)
+//                                } else {
+//                                    // Like: cập nhật UI trước, sau đó gọi API
+//                                    isLiked = true
+//                                    post.isLiked = true
+//                                    post.likeCount = post.likeCount?.plus(1)
+//                                    triggerAnimation = true
+//                                    viewModel.LikePost(postId = post.id ?: 0)
+//                                }
+//                            } catch (e: Exception) {
+//                                // Nếu API call thất bại, revert lại UI state
+//                                isLiked = !isLiked
+//                                post.isLiked = !post.isLiked
+//                                // Revert likeCount
+//                                if (isLiked) {
+//                                    post.likeCount = (post.likeCount?.minus(1))?.coerceAtLeast(0)
+//                                } else {
+//                                    post.likeCount = post.likeCount?.plus(1)
+//                                }
+//                            }
+//                        }
+//                    }) {
+//                        Icon(
+//                            painter = painterResource(
+//                                id = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart
+//                            ),
+//                            contentDescription = "Like",
+//                            tint = likeColor,
+//                            modifier = Modifier.scale(animatedScale)
+//                        )
+//                    }
+//                    IconButton(onClick = { }) {
+//                        Icon(
+//                            painter = painterResource(id = R.drawable.ic_comment),
+//                            contentDescription = "Comment",
+//                            tint = MaterialTheme.colorScheme.onSurface
+//                        )
+//                    }
+//                    IconButton(onClick = {
+//                        showShareDialog = true
+//                    }) {
+//                        Icon(
+//                            painter = painterResource(id = R.drawable.ic_share),
+//                            contentDescription = "Share original",
+//                            tint = MaterialTheme.colorScheme.onSurface,
+//                            modifier = Modifier.size(20.dp)
+//                        )
+//                    }
+//
+//                }
+//            }
+//        }
+//    }
+//    if (showShareDialog) {
+//        ShareDialog(
+//            originalPost =  post,
+//            currentUserAvatar = viewModel.currentUser?.profilePicture,
+//            onDismiss = { showShareDialog = false },
+//            onShare = { content ->
+//                scope.launch {
+//                    val targetPostId = post.id
+//                    viewModel.sharePost(
+//                        originalPostId = targetPostId ?: 0,
+//                        shareContent = content
+//                    )
+//                }
+//                showShareDialog = false
+//            }
+//        )
+//    }
+//}
 
 @OptIn(UnstableApi::class)
 @RequiresApi(Build.VERSION_CODES.O)

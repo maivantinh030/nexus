@@ -1,21 +1,115 @@
 package com.example.nexus.ui.activity
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.nexus.network.ApiService
 import com.example.nexus.network.RetrofitClient
 import com.example.nexus.ui.model.CreateNotificationRequest
 import com.example.nexus.ui.model.Notification
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
 import com.example.nexus.ui.timeline.TimelineViewModel
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-class ActivityViewModel : ViewModel() {
+class ActivityViewModel(
+    private val apiService: ApiService,
+    private val fcmManager: FCMManager
+) : ViewModel() {
 
+    val context = fcmManager.context
+    init {
+        // Khởi tạo FCM token khi ViewModel được tạo
+        initializeFCM()
+        debugFCMToken()
+    }
+    private fun initializeFCM() {
+        viewModelScope.launch {
+            try {
+                val token = fcmManager.getFCMToken()
+                token?.let {
+                    // Gửi token lên server
+                    sendFCMTokenToServer(it)
+                }
+            } catch (e: Exception) {
+                Log.e("ActivityViewModel", "Error initializing FCM", e)
+            }
+        }
+    }
+    private suspend fun sendFCMTokenToServer(token: String) {
+        try {
+            val requestBody = mapOf("fcmToken" to token)
+            apiService.updateFCMToken(requestBody)
+            Log.d("ActivityViewModel", "FCM token sent to server successfully")
+        } catch (e: Exception) {
+            Log.e("ActivityViewModel", "Error sending FCM token to server", e)
+        }
+    }
+    fun removeFCMToken() {
+        viewModelScope.launch {
+            try {
+                apiService.removeFCMToken()
+                Log.d("ActivityViewModel", "FCM token removed from server")
+            } catch (e: Exception) {
+                Log.e("ActivityViewModel", "Error removing FCM token", e)
+            }
+        }
+    }
+    fun refreshFCMToken() {
+        viewModelScope.launch {
+            try {
+                Log.d("FCM_REFRESH", "=== REFRESH FCM TOKEN ===")
+
+                // Xóa token cũ trước
+                FirebaseMessaging.getInstance().deleteToken().await()
+                Log.d("FCM_REFRESH", "Old token deleted")
+
+                // Lấy token mới
+                val newToken = fcmManager.getFCMToken() // Này sẽ tạo token mới
+                newToken?.let {
+                    sendFCMTokenToServer(it)
+                    Log.d("FCM_REFRESH", "New token refreshed and sent successfully")
+                }
+            } catch (e: Exception) {
+                Log.e("ActivityViewModel", "Error refreshing FCM token", e)
+            }
+        }
+    }
+    fun debugFCMToken() {
+        viewModelScope.launch {
+            try {
+                Log.d("FCM_DEBUG", "=== FCM TOKEN DEBUG ===")
+
+                // Lấy token mới
+                val token = FirebaseMessaging.getInstance().token.await()
+                Log.d("FCM_DEBUG", "FCM Token: $token")
+                Log.d("FCM_DEBUG", "Token length: ${token?.length}")
+
+                // Kiểm tra Firebase project info
+                FirebaseApp.getInstance().options.let { options ->
+                    Log.d("FCM_DEBUG", "Firebase Project ID: ${options.projectId}")
+                    Log.d("FCM_DEBUG", "Firebase App ID: ${options.applicationId}")
+                    Log.d("FCM_DEBUG", "Package name: ${context.packageName}")
+                }
+
+                // Test gửi lên server
+                token?.let {
+                    Log.d("FCM_DEBUG", "Sending token to server...")
+                    sendFCMTokenToServer(it)
+                }
+
+            } catch (e: Exception) {
+                Log.e("FCM_DEBUG", "FCM Debug failed", e)
+            }
+        }
+    }
     private val _notificationState = MutableStateFlow(NotificationState())
     val notificationState: StateFlow<NotificationState> = _notificationState.asStateFlow()
 
@@ -201,4 +295,66 @@ class ActivityViewModel : ViewModel() {
         val last: Boolean = false,
         val error: String? = null
     )
+}
+class FCMManager(internal val context: Context) {
+
+    companion object {
+        private const val TAG = "FCMManager"
+        private const val PREF_FCM_TOKEN = "fcm_token"
+    }
+
+    private val sharedPreferences = context.getSharedPreferences("nexus_prefs", Context.MODE_PRIVATE)
+
+    suspend fun getFCMToken(): String? {
+        return try {
+            val token = FirebaseMessaging.getInstance().token.await()
+            Log.d(TAG, "FCM Token: $token")
+
+            // Lưu token vào SharedPreferences
+            sharedPreferences.edit()
+                .putString(PREF_FCM_TOKEN, token)
+                .apply()
+
+            token
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get FCM token", e)
+            null
+        }
+    }
+
+    fun getCachedToken(): String? {
+        return sharedPreferences.getString(PREF_FCM_TOKEN, null)
+    }
+
+    suspend fun refreshToken(): String? {
+        return try {
+            FirebaseMessaging.getInstance().deleteToken().await()
+            getFCMToken()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to refresh FCM token", e)
+            null
+        }
+    }
+
+    fun subscribeToTopic(topic: String) {
+        FirebaseMessaging.getInstance().subscribeToTopic(topic)
+            .addOnCompleteListener { task ->
+                var msg = "Subscribed to $topic"
+                if (!task.isSuccessful) {
+                    msg = "Subscribe failed"
+                }
+                Log.d(TAG, msg)
+            }
+    }
+
+    fun unsubscribeFromTopic(topic: String) {
+        FirebaseMessaging.getInstance().unsubscribeFromTopic(topic)
+            .addOnCompleteListener { task ->
+                var msg = "Unsubscribed from $topic"
+                if (!task.isSuccessful) {
+                    msg = "Unsubscribe failed"
+                }
+                Log.d(TAG, msg)
+            }
+    }
 }

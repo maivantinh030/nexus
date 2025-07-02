@@ -22,6 +22,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.nexus.R
+import com.example.nexus.network.RetrofitClient
 import com.example.nexus.ui.model.Notification
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
@@ -92,100 +95,108 @@ fun ActivityScreen(
             }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        SnackbarHost(hostState = snackbarHostState)
-        Text(
-            text = "Notifications",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(
+            brush = Brush.linearGradient(
+                colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+            )
+        )){
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            SnackbarHost(hostState = snackbarHostState)
+            Text(
+                text = "Hoạt động",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
 
-        when {
-            notificationState.loading && notificationState.notifications.isEmpty() -> {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentSize(Alignment.Center)
-                )
-            }
-            notificationState.error != null -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentSize(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Error: ${notificationState.error}",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge
+            when {
+                notificationState.loading && notificationState.notifications.isEmpty() -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentSize(Alignment.Center)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                notificationState.error != null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentSize(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Error: ${notificationState.error}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
 //                    Button(onClick = { activityViewModel.fetchNotifications(page = 0) }) {
 //                        Text("Try Again")
 //                    }
+                    }
                 }
-            }
-            else -> {
-                LazyColumn(state = listState) {
-                    items(notificationState.notifications) { notification ->
-                        NotificationCard(
-                            notification = notification,
-                            timelineViewModel = timelineViewModel,
-                            activityViewModel = activityViewModel,
-                            navController = navController,
-                            context = context
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    if (notificationState.loadingMore) {
-                        item {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                                    .wrapContentSize(Alignment.Center)
+                else -> {
+                    LazyColumn(state = listState) {
+                        items(notificationState.notifications) { notification ->
+                            NotificationCard(
+                                notification = notification,
+                                timelineViewModel = timelineViewModel,
+                                activityViewModel = activityViewModel,
+                                navController = navController,
+                                context = context
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
-                    }
-                    if (notificationState.last && notificationState.notifications.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = "Đã hết thông báo",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
+                        if (notificationState.loadingMore) {
+                            item {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp)
+                                        .wrapContentSize(Alignment.Center)
+                                )
+                            }
                         }
-                    }
-                    if (notificationState.notifications.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 32.dp)
-                                    .wrapContentSize(Alignment.Center)
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "No notifications",
-                                        modifier = Modifier.size(48.dp),
-                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        text = "No notifications yet",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    )
+                        if (notificationState.last && notificationState.notifications.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Đã hết thông báo",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                        if (notificationState.notifications.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 32.dp)
+                                        .wrapContentSize(Alignment.Center)
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "No notifications",
+                                            modifier = Modifier.size(48.dp),
+                                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "No notifications yet",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -319,7 +330,7 @@ fun NotificationCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     AsyncImage(
-                        model = actorProfilePicture ?: R.drawable.ic_avatar_placeholder,
+                        model = RetrofitClient.MEDIA_BASE_URL + actorProfilePicture,
                         contentDescription = "User avatar",
                         modifier = Modifier
                             .size(24.dp)
@@ -352,23 +363,6 @@ fun NotificationCard(
                 )
             }
 
-            if (notification.type == "FOLLOW" && !notification.isRead) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        scope.launch {
-                            timelineViewModel.followUser(notification.actorId)
-                            activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
-                            Toast.makeText(context, "Followed back", Toast.LENGTH_SHORT).show()
-                        }
-
-                    },
-                    modifier = Modifier.height(36.dp),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Text("Follow back", fontSize = 12.sp)
-                }
-            }
         }
     }
 }
