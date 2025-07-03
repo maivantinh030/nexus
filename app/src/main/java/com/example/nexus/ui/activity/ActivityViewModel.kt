@@ -336,25 +336,25 @@ class FCMManager(internal val context: Context) {
         }
     }
 
-    fun subscribeToTopic(topic: String) {
-        FirebaseMessaging.getInstance().subscribeToTopic(topic)
-            .addOnCompleteListener { task ->
-                var msg = "Subscribed to $topic"
-                if (!task.isSuccessful) {
-                    msg = "Subscribe failed"
-                }
-                Log.d(TAG, msg)
-            }
-    }
-
-    fun unsubscribeFromTopic(topic: String) {
-        FirebaseMessaging.getInstance().unsubscribeFromTopic(topic)
-            .addOnCompleteListener { task ->
-                var msg = "Unsubscribed from $topic"
-                if (!task.isSuccessful) {
-                    msg = "Unsubscribe failed"
-                }
-                Log.d(TAG, msg)
-            }
-    }
+//    fun subscribeToTopic(topic: String) {
+//        FirebaseMessaging.getInstance().subscribeToTopic(topic)
+//            .addOnCompleteListener { task ->
+//                var msg = "Subscribed to $topic"
+//                if (!task.isSuccessful) {
+//                    msg = "Subscribe failed"
+//                }
+//                Log.d(TAG, msg)
+//            }
+//    }
+//
+//    fun unsubscribeFromTopic(topic: String) {
+//        FirebaseMessaging.getInstance().unsubscribeFromTopic(topic)
+//            .addOnCompleteListener { task ->
+//                var msg = "Unsubscribed from $topic"
+//                if (!task.isSuccessful) {
+//                    msg = "Unsubscribe failed"
+//                }
+//                Log.d(TAG, msg)
+//            }
+//    }
 }

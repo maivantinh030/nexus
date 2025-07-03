@@ -200,9 +200,15 @@ fun PostDetailContent(
         }
         post.isLiked = viewModel.checkLike("POST", post.id ?: 0)
         viewModel.fetchLikeCount("POST",post.id?:0)
-
     }
 
+    LaunchedEffect(post.commentCount) {
+        if (post.commentCount > 0) {
+            viewModel.getCommentsForPost(post.id ?: 0)
+        } else {
+            viewState.comments = emptyList() // Clear comments if no comments exist
+        }
+    }
     LaunchedEffect(triggerAnimation) {
         if (triggerAnimation) {
             scale = 1.5f

@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,6 +64,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.Log
@@ -265,7 +267,7 @@ fun ProfileScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(30.dp) // Ensure consistent height
+                            .height(40.dp) // Tăng height từ 30dp lên 40dp
                             .then(
                                 if (isFollowing) {
                                     Modifier.border(
@@ -281,10 +283,15 @@ fun ProfileScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isFollowing) MaterialTheme.colorScheme.surface else Color.Black,
                             contentColor = if (isFollowing) MaterialTheme.colorScheme.onSurface else Color.White
-                        )
-
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp) // Thêm padding
                     ) {
-                        Text(if (isFollowing) "Unfollow" else "Follow")
+                        Text(
+                            text = if (isFollowing) "Hủy theo dõi" else "Theo dõi",
+                            fontSize = 14.sp, // Đặt font size rõ ràng
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -463,6 +470,7 @@ fun ChangePassword(
     var passwordErrorMessage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier
         .fillMaxSize()
@@ -565,11 +573,17 @@ fun ChangePassword(
             Button(
                 onClick = {
                     if (isFormValid(currentPassword, newPassword, confirmPassword)) {
-                        // Handle password change logic
-                        Toast.makeText(context, "Password changed successfully", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            // Call the change password function in the ViewModel
+                            viewModel.changePassword(
+                                currentPassword = currentPassword,
+                                newPassword = newPassword
+                            )
+                        }
+                        Toast.makeText(context, "Đổi mật khẩu thành công", Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     } else {
-                        Toast.makeText(context, "Please complete all fields correctly", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Vui lòng điền chính xác các thông tin", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier

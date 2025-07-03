@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
@@ -226,9 +227,13 @@ fun NotificationCard(
             Icons.Default.Favorite,
             MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
         )
-        "COMMENT", "REPLY_POST", "MENTION_POST", "MENTION_COMMENT" -> Pair(
+        "COMMENT", "REPLY_POST", "MENTION_POST", "MENTION_COMMENT","NEW_POST" -> Pair(
             Icons.Default.Comment,
             MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
+        )
+        "NEW_POST" -> Pair(
+            Icons.Default.Add,
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
         )
         "FOLLOW" -> Pair(
             Icons.Default.Person,

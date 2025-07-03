@@ -644,55 +644,27 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
             }
         }
     }
-    // Repost bài đăng
-    fun repost(post: Post) {
-//        val repost = post.copy(
-//            id = (_posts.value.maxOfOrNull { it.id ?: 0 } ?: 0) + 1,
-//            content = "Reposted: ${post.content}",
-//            created_at = "2025-05-13T14:55:00Z",
-//            updated_at = "2025-05-13T14:55:00Z"
-//        )
-//        _posts.value = listOf(repost) + _posts.value
-    }
+    suspend fun changePassword(
+        newPassword: String
+    ): Boolean {
+        return try {
+            val patchUserDTO = PatchUserDTO(
+                password = newPassword
+            )
 
-    fun replyPost(parentPostId: Long, content: String) {
-//        _currentPost.value?.let { currentPost ->
-//            val newReply = Post(
-//                id = (_posts.value.maxOfOrNull { it.id ?: 0 } ?: 0) + 1,
-//                user = User(id = 1, username = "user1", bio = "Hello!", profile_picture = "https://example.com/avatar.jpg"),
-//                parent_post_id = parentPostId,
-//                content = content,
-//                created_at = "2025-05-13T14:55:00Z",
-//                updated_at = "2025-05-13T14:55:00Z"
-//            )
-//
-//            if (currentPost.id == parentPostId) {
-//                _currentPost.value = currentPost.copy(
-//                    replies = currentPost.replies + newReply
-//                )
-//            } else {
-//                val updatedReplies = currentPost.replies.map { reply ->
-//                    if (reply.id == parentPostId) {
-//                        reply.copy(parent_post_id = currentPost.id)
-//                    } else {
-//                        reply
-//                    }
-//                }
-//                _currentPost.value = currentPost.copy(
-//                    replies = updatedReplies + newReply
-//                )
-//            }
-//
-//            _posts.update { currentPosts ->
-//                currentPosts.map { post ->
-//                    if (post.id == currentPost.id) {
-//                        _currentPost.value!!
-//                    } else {
-//                        post
-//                    }
-//                }
-//            }
-//        }
+            val response = RetrofitClient.apiService.updateCurrentUser(patchUserDTO)
+
+            if (response.success) {
+                Log.d("TimelineViewModel", "Password changed successfully")
+                true
+            } else {
+                Log.e("TimelineViewModel", "Failed to change password: ${response.message}")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("TimelineViewModel", "Error changing password", e)
+            false
+        }
     }
 
     @OptIn(UnstableApi::class)
@@ -772,7 +744,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
 
     data class CommentState(
         val loading: Boolean = true,
-        val comments: List<Comment> = emptyList(),
+        var comments: List<Comment> = emptyList(),
         val error: String? = null
     )
 

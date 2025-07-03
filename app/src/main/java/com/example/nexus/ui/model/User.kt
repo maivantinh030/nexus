@@ -32,5 +32,6 @@ data class PatchUserDTO(
     val email: String? = null,
     val fullName: String? = null,
     val bio: String? = null,
-    val profilePicture: String? = null
+    val profilePicture: String? = null,
+    val password: String? = null
 )
