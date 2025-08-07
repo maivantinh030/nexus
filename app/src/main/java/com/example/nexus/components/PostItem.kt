@@ -4,6 +4,7 @@ package com.example.nexus.components
 
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateColorAsState
@@ -685,12 +686,11 @@ fun PostItem(
                         reason = reason,
                         description = description
                     )
-
                     if (success) {
-                        // Hiển thị thông báo thành công
-                        // Có thể dùng Snackbar hoặc Toast
+                        Toast.makeText(context, "Báo cáo thành công", Toast.LENGTH_SHORT).show()
                     } else {
                         // Hiển thị thông báo lỗi
+                        Toast.makeText(context, "Báo cáo thất bại", Toast.LENGTH_SHORT).show()
                     }
                 }
                 showReportDialog = false
@@ -1022,7 +1022,7 @@ fun ReportDialog(
     var selectedReason by remember { mutableStateOf<ReportReason?>(null) }
     var description by remember { mutableStateOf("") }
 
-    // Danh sách các lý do báo cáo với label tiếng Việt
+    // Danh sách các lý do báo cáo
     val reasons = listOf(
         ReportReason.SPAM to "Spam",
         ReportReason.HARASSMENT to "Quấy rối",

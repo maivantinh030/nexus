@@ -21,9 +21,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
@@ -41,6 +46,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -64,7 +70,6 @@ import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel,
-    activityViewModel: ActivityViewModel? = null,
     navController: NavController? = null
 ) {
     val viewState by viewModel.postsState
@@ -77,7 +82,7 @@ fun TimelineScreen(
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
     val lazyListState = rememberLazyListState()
 
-    // ✅ Simple infinite scroll với firstVisibleItemIndex
+    // cuộn vô hạn khi còn 5 item sẽ tự động tải thêm từ server
     LaunchedEffect(lazyListState) {
         snapshotFlow { lazyListState.firstVisibleItemIndex }.collect { firstIndex ->
             val totalItems = posts.size
@@ -137,15 +142,38 @@ fun TimelineScreen(
                             .size(40.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Có gì mới?",
-                        style = MaterialTheme.typography.bodyMedium,
+                    Button(
+                        onClick = {
+                            navController?.navigate("create_post")
+                        },
                         modifier = Modifier
                             .weight(1f)
-                            .clickable {
-                                navController?.navigate("create_post")
-                            }
-                    )
+                            .shadow(elevation = 4.dp,shape = RoundedCornerShape(16.dp))
+                        ,
+                        colors = ButtonDefaults.buttonColors(
+                            contentColor = Color.White,
+                            containerColor = Color.White
+                        )
+
+                    ){
+                        Text(
+                            text = "Có gì mới?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                            color = Color.Black
+                        )
+                    }
+                    IconButton(
+                        onClick ={
+
+                        }
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_message),
+                            contentDescription = "Messages",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
 
                 Divider(

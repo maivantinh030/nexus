@@ -205,7 +205,7 @@ fun UserItem(
             Spacer(modifier = Modifier.width(12.dp))
             Column(){
                 Text(
-                    text = user.username,
+                    text = user.fullName.toString(),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp

@@ -165,7 +165,6 @@ fun AppNavGraph(viewModel: TimelineViewModel? = null) {
                 timelineViewModel?.let { vm ->
                     TimelineScreen(
                         viewModel = vm,
-                        activityViewModel = activityViewModel,
                         navController = navController
                     )
                 } ?: run {
@@ -223,7 +222,7 @@ fun AppNavGraph(viewModel: TimelineViewModel? = null) {
             }
             composable(
                 route = "post_detail/{postId}",
-                arguments = listOf(navArgument("postId") { type = NavType.LongType }) // Đổi từ Long sang Int
+                arguments = listOf(navArgument("postId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val postId = backStackEntry.arguments?.getLong("postId")
                 if (postId != null&& timelineViewModel != null) {

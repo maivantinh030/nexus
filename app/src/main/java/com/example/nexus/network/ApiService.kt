@@ -226,7 +226,6 @@ interface ApiService {
     @DELETE("/yapping/api/fcm/token")
     suspend fun removeFCMToken(): ApiResponse<Any>
 
-    // Trong ApiService
     @POST("/yapping/api/reports")
     suspend fun createReport(
         @Body request: CreateReportRequest

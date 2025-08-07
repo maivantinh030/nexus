@@ -37,21 +37,24 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 class TimelineViewModel(val authManager: AuthManager, private val context: Context) : ViewModel() {
 
+    //Quản lý danh sách bài đăng
     private val _postsState = mutableStateOf(PostState())
     val postsState: State<PostState> = _postsState
-
+    //Quản lý danh sách bình luận
     private val _commentState = mutableStateOf(CommentState())
     val commentState: State<CommentState> = _commentState
 
+    //Cache user
     private val _userCache = MutableStateFlow<Map<Long, User>>(emptyMap())
     val userCache: StateFlow<Map<Long, User>> = _userCache.asStateFlow()
+    //Cache post
     private val _postCache = MutableStateFlow<Map<Long, Post>>(emptyMap())
     val postCache: StateFlow<Map<Long, Post>> = _postCache.asStateFlow()
     val activityViewModel = ActivityViewModel(
         apiService = RetrofitClient.apiService,
         fcmManager = FCMManager(context)
     )
-    // Chuyển sang MutableStateFlow để quản lý bất đồng bộ
+    // Danh sách người dùng theo dõi và đang theo dõi
     private val _listUserFollow = MutableStateFlow<List<User>>(emptyList())
     val listUserFollow: StateFlow<List<User>> = _listUserFollow.asStateFlow()
     private val _listUserFollowing = MutableStateFlow<List<User>>(emptyList())
@@ -73,7 +76,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
         }
     }
     init {
-        // ✅ Only fetch posts if user is authenticated
+        // Kiểm tra xem người dùng đã đăng nhập hay chưa
         if (authManager.isUserLoggedIn()) {
             try {
                 fetchPosts()
@@ -90,6 +93,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
             Log.d("TimelineViewModel", "=== FETCH POSTS DEBUG ===")
             Log.d("TimelineViewModel", "User logged in: ${authManager.isUserLoggedIn()}")
             Log.d("TimelineViewModel", "Current user ID: ${authManager.getUserId()}")
+            //Kiểm tra token trước khi gọi
             if (!ensureValidToken()) {
                 _postsState.value = _postsState.value.copy(
                     loading = false,
@@ -99,7 +103,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                 return@launch
             }
             try {
-                val response = RetrofitClient.apiService.getPosts(page = page)
+                val response = apiService.getPosts(page = page)
                 if(response.success){
                     Log.d("TimelineViewModel", "Processing ${response.data.content.size} posts")
                     _postsState.value = PostState(
@@ -197,7 +201,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     fun getAccessToken(): String? {
         return authManager.getAccessToken()
     }
-    // Giả sử ID của người dùng hiện tại (lấy từ SharedPreferences hoặc Auth sau này)
+
     val currentUserId: Long?
         get() = authManager.getUserId()
 
@@ -307,7 +311,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     suspend fun getPostById(postId: Long): Post? {
         _postCache.value[postId]?.let { return it }
         return try {
-            val response = RetrofitClient.apiService.getPostById(postId)
+            val response = apiService.getPostById(postId)
             if (response.success) {
                 val post = response.data
                 val user = post.user?.id?.let { getUserById(it) }
@@ -386,7 +390,6 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
             }
         }
     }
-    // Mô phỏng bảng Follows: Danh sách các cặp (follower_id, followed_id)
     private val _follows = MutableStateFlow<List<Pair<Long, Long>>>(
         listOf(
             Pair(1, 2), // Người dùng 1 theo dõi người dùng 2
@@ -399,7 +402,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     suspend fun followUser(userId: Long) {
         currentUserId.let{
             try{
-                val response = RetrofitClient.apiService.followUser(userId)
+                val response = apiService.followUser(userId)
             }
             catch (e: Exception) {
                 e.printStackTrace()
@@ -411,7 +414,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     suspend fun unfollowUser(userId: Long) {
         currentUserId.let{
             try{
-                val response = RetrofitClient.apiService.unfollowUser(userId)
+                val response = apiService.unfollowUser(userId)
             }
             catch (e: Exception) {
                 e.printStackTrace()
@@ -422,7 +425,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     suspend fun LikePost(postId: Long) {
         currentUserId.let {
             try {
-                val response = RetrofitClient.apiService.likePost(postId)
+                val response = apiService.likePost(postId)
                 if(response.success){
                     val post = _postCache.value[postId]?.copy(isLiked = true, likeCount = _postCache.value[postId]?.likeCount?.plus(1) ?: 1)
                     post?.let {p->
@@ -444,7 +447,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     suspend fun unLike(TagetType: String, targetId: Long) {
         currentUserId.let {
             try {
-                val response = RetrofitClient.apiService.unLike(currentUserId?:0, TagetType, targetId)
+                val response = apiService.unLike(currentUserId?:0, TagetType, targetId)
                 if(response.success){
                     if (TagetType.equals("POST", ignoreCase = true)) {
                         val post = _postCache.value[targetId]?.copy(isLiked = false, likeCount = _postCache.value[targetId]?.likeCount?.minus(1) ?: 0)
@@ -477,7 +480,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     suspend fun likeComment(commentId: Long){
         currentUserId.let{
             try {
-                val response = RetrofitClient.apiService.likeComment(commentId)
+                val response = apiService.likeComment(commentId)
                 if(response.success){
                     val comment = _commentState.value.comments.find { it.id == commentId }
                     if (comment != null) {
@@ -548,24 +551,11 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
         parentPostId: Long?,
         mediaUris: List<Uri>
     ): ApiResponse<Post> {
-
-        Log.d("MediaUpload", "Creating post with ${mediaUris.size} media files")
-
         val mediaParts = mediaUris.mapIndexedNotNull { index, uri ->
             createMediaPart(uri, "files", context)
         }
-
-        Log.d("MediaUpload", "Successfully created ${mediaParts.size}/${mediaUris.size} parts")
-
-        // ✅ Log request parameters
-        Log.d("API_REQUEST", "=== API Request Debug ===")
-        Log.d("API_REQUEST", "Content: '$content'")
-        Log.d("API_REQUEST", "Visibility: '$visibility'")
-        Log.d("API_REQUEST", "ParentPostId: $parentPostId")
-        Log.d("API_REQUEST", "Media parts count: ${mediaParts.size}")
-
         try {
-            val response = RetrofitClient.apiService.createPostWithMedia(
+            val response = apiService.createPostWithMedia(
                 content = content.toRequestBody("text/plain".toMediaTypeOrNull()),
                 visibility = visibility.toRequestBody("text/plain".toMediaTypeOrNull()),
                 parentPostId = parentPostId?.toString()
@@ -573,32 +563,8 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                 files = mediaParts.ifEmpty { null }
             )
 
-            // ✅ Log detailed response
-            Log.d("API_RESPONSE", "=== API Response Debug ===")
-            Log.d("API_RESPONSE", "Success: ${response.success}")
-            Log.d("API_RESPONSE", "Message: '${response.message}'")
-            Log.d("API_RESPONSE", "Data: ${response.data}")
-
-            // ✅ Log post details if created
-            response.data?.let { post ->
-                Log.d("API_RESPONSE", "Created Post ID: ${post.id}")
-                Log.d("API_RESPONSE", "Post Content: '${post.content}'")
-                Log.d("API_RESPONSE", "Post Media Count: ${post.media?.size ?: 0}")
-
-                post.media?.forEachIndexed { index, media ->
-                    Log.d(
-                        "API_RESPONSE",
-                        "Media $index: ${media.mediaUrl}, Type: ${media.mediaType}"
-                    )
-                }
-            }
-
             return response
-
         } catch (e: Exception) {
-            Log.e("API_ERROR", "❌ API call failed", e)
-            Log.e("API_ERROR", "Exception type: ${e.javaClass.simpleName}")
-            Log.e("API_ERROR", "Exception message: ${e.message}")
             throw e
         }
     }
@@ -624,8 +590,6 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                     parentPostId = originalPostId, // Set parentPostId = ID bài được share
                     mediaUris = emptyList() // Không có media khi share
                 )
-
-
                 // Tạo thông báo
                 val originalPost = _postCache.value[originalPostId]
                 activityViewModel.addNotification(
@@ -644,6 +608,8 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
             }
         }
     }
+
+    @OptIn(UnstableApi::class)
     suspend fun changePassword(
         newPassword: String
     ): Boolean {
@@ -652,8 +618,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                 password = newPassword
             )
 
-            val response = RetrofitClient.apiService.updateCurrentUser(patchUserDTO)
-
+            val response = apiService.updateCurrentUser(patchUserDTO)
             if (response.success) {
                 Log.d("TimelineViewModel", "Password changed successfully")
                 true
@@ -676,7 +641,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                     commentId = commentId,
                     mentionedUserId = mentionedUserId
                 )
-                val response = RetrofitClient.apiService.createMention(request)
+                val response = apiService.createMention(request)
                 if (response.success) {
                     Log.d("TimelineViewModel", "Mention created successfully")
                 } else {
@@ -696,7 +661,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                     content = content,
                     parentCommentId = parentCommentId
                 )
-                val response = RetrofitClient.apiService.createComment(request)
+                val response = apiService.createComment(request)
                 if (response.success) {
                     val newComment = response.data
                     _commentState.value = if (parentCommentId == null) {
@@ -763,7 +728,6 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                     return false
                 }
             }
-
             // Cập nhật thông tin profile
             val patchUserDTO = PatchUserDTO(
                 fullName = fullName,
@@ -771,7 +735,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                 email = email
             )
 
-            val response = RetrofitClient.apiService.updateCurrentUser(patchUserDTO)
+            val response = apiService.updateCurrentUser(patchUserDTO)
 
             if (response.success) {
                 // Cập nhật cache
@@ -833,8 +797,7 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
                 reason = reason,
                 description = description.takeIf { it.isNotBlank() }
             )
-
-            val response = RetrofitClient.apiService.createReport(createReportRequest)
+            val response = apiService.createReport(createReportRequest)
 
             if (response.success) {
                 Log.d("TimelineViewModel", "Report created successfully")

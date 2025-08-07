@@ -36,8 +36,7 @@ class SearchViewModel(
                     user.username.contains(query, ignoreCase = true) ||
                             (user.bio?.contains(query, ignoreCase = true) == true) ||
                             (user.fullName?.contains(query, ignoreCase = true) == true)
-                }
-                .map { SearchResult.UserResult(it) }
+                }.map { SearchResult.UserResult(it) }
 
             // Tìm kiếm posts từ postCache
             val postResults = posts.values

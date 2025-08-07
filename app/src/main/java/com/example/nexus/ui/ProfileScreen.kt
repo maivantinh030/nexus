@@ -94,7 +94,6 @@ fun ProfileScreen(
     var following by remember { mutableStateOf<List<User>>(emptyList()) }
     var user: User? by remember { mutableStateOf(null) }
     val viewState by timelineViewModel.postsState
-    val follows by timelineViewModel.follows.collectAsState()
     val context = LocalContext.current
     var isFollowing by remember{mutableStateOf(false)}
 
@@ -416,16 +415,6 @@ fun SettingScreen(
         }
     }
 }
-//@Preview(showBackground = true)
-//@Composable
-//fun SettingScreenPreview() {
-//    MaterialTheme {
-//        SettingScreen(
-//            viewModel = TimelineViewModel(),
-//            navController = NavController(LocalContext.current)
-//        )
-//    }
-//}
 @Composable
 fun SettingItem(
     title: String,
@@ -575,10 +564,10 @@ fun ChangePassword(
                     if (isFormValid(currentPassword, newPassword, confirmPassword)) {
                         scope.launch {
                             // Call the change password function in the ViewModel
-                            viewModel.changePassword(
-                                currentPassword = currentPassword,
-                                newPassword = newPassword
-                            )
+//                            viewModel.changePassword(
+//                                currentPassword = currentPassword,
+//                                newPassword = newPassword
+//                            )
                         }
                         Toast.makeText(context, "Đổi mật khẩu thành công", Toast.LENGTH_SHORT).show()
                         navController.popBackStack()

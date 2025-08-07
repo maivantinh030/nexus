@@ -6,9 +6,9 @@ data class Notification(
     val username: String,
     val userFullName: String,
     val userProfilePicture: String?,
-    val actorId: Long,
-    val actorUsername: String,
-    val actorFullName: String,
+    val actorId: Long?,
+    val actorUsername: String?,
+    val actorFullName: String?,
     val actorProfilePicture: String?,
     val type: String,
     val targetType: String,
@@ -21,7 +21,6 @@ data class Notification(
     val message: String,
     val redirectUrl: String
 )
-
 // NotificationResponse Model
 data class NotificationResponse(
     val status: Int,
@@ -29,7 +28,6 @@ data class NotificationResponse(
     val message: String,
     val data: NotificationPageData
 )
-
 // NotificationPageData Model
 data class NotificationPageData(
     val content: List<Notification>,

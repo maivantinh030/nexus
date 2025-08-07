@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -88,7 +89,7 @@ fun ActivityScreen(
                         scope.launch {
                             val userId = timelineViewModel.currentUserId
                             if (userId != null) {
-                                activityViewModel.loadMoreNotifications() // Cập nhật để truyền userId
+                                activityViewModel.loadMoreNotifications()
                             }
                         }
                     }
@@ -219,7 +220,7 @@ fun NotificationCard(
 ) {
     val scope = rememberCoroutineScope()
 
-    val actorName = notification.actorFullName.ifEmpty { notification.actorUsername }
+    val actorName = notification.actorFullName?.ifEmpty { notification.actorUsername }
     val actorProfilePicture = notification.actorProfilePicture
 
     val (icon, backgroundColor) = when (notification.type) {
@@ -242,6 +243,10 @@ fun NotificationCard(
         "REPOST" -> Pair(
             Icons.Default.Refresh,
             MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
+        )
+        "SYSTEM" -> Pair(
+            Icons.Default.Settings,
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         )
         else -> Pair(
             Icons.Default.Refresh,
@@ -277,7 +282,7 @@ fun NotificationCard(
             .clickable {
                 activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
                 when (notification.type) {
-                    "LIKE_POST", "COMMENT" -> {
+                    "LIKE_POST", "COMMENT","NEW_POST" -> {
                         if (notification.targetId != null) {
                             navController?.navigate("post_detail/${notification.targetId}") ?: run {
                                 Toast.makeText(context, "Cannot navigate to post details", Toast.LENGTH_SHORT).show()
@@ -344,7 +349,7 @@ fun NotificationCard(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = actorName,
+                        text = actorName?: "Hệ thống",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface

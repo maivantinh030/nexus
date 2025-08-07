@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL =
-        "http://192.168.1.120:8080/"
-        const val MEDIA_BASE_URL = "http://192.168.1.120:8080/yapping"
+        "http://10.0.2.2:8080/"
+        const val MEDIA_BASE_URL = "http://10.0.2.2:8080/yapping"
 
     private lateinit var authManager: AuthManager
 
@@ -29,7 +29,6 @@ object RetrofitClient {
         Log.d("RetrofitClient", "Request: ${request.url}")
         val response: Response = chain.proceed(request)
         Log.d("RetrofitClient", "Response: ${response.code}")
-        // ✅ THÊM: Nếu server trả về 401 thì logout
         if (response.code == 401) {
             Log.w("RetrofitClient", "Received 401, logging out")
             authManager.logoutSync()
@@ -45,7 +44,7 @@ object RetrofitClient {
 
     val apiService: ApiService by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL) // Đảm bảo cổng đúng
+            .baseUrl(BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
