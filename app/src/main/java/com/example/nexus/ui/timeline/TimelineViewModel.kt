@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -60,6 +61,8 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
     private val _listUserFollowing = MutableStateFlow<List<User>>(emptyList())
     val listUserFollowing: StateFlow<List<User>> = _listUserFollowing.asStateFlow()
 
+    var unread_count: MutableState<Long> = mutableStateOf(0)
+
     @OptIn(UnstableApi::class)
     private suspend fun ensureValidToken(): Boolean {
         return try {
@@ -81,6 +84,8 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
             try {
                 fetchPosts()
                 fetchUserFollowersAndFollowing()
+                getUnReadNotificationCount()
+                Log.d("Unread","${unread_count.value}")
             } catch (e: Exception) {
 
             }
@@ -227,6 +232,21 @@ class TimelineViewModel(val authManager: AuthManager, private val context: Conte
             }
         }
     }
+
+     fun getUnReadNotificationCount() {
+         viewModelScope.launch {
+             val response = RetrofitClient.apiService.countUnreadNotifications()
+             Log.d("Unread","${unread_count.value}")
+             if (response.success) {
+                 unread_count.value = response.data ?: 0
+
+             } else {
+                 unread_count.value = 0
+             }
+         }
+
+    }
+
     suspend fun getUserById(userId: Long): User? {
         return try {
             val response = apiService.getUserById(userId)

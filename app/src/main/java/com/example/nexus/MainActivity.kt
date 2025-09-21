@@ -48,6 +48,8 @@ class MainActivity : ComponentActivity() {
         val timelineViewModel = TimelineViewModel(authManager, this)
         // Get FCM token directly
         getAndSaveFCMToken()
+
+
         enableEdgeToEdge()
         setContent {
             val isLoggedIn by authManager.isLoggedIn.collectAsState()
@@ -55,6 +57,7 @@ class MainActivity : ComponentActivity() {
                 if (isLoggedIn) {
                     refreshFCMTokenOnLogin()
                 }
+
             }
             NexusTheme {
                 Box(

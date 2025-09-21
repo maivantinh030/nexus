@@ -9,6 +9,7 @@ import com.example.nexus.ui.model.CreatePostRequest
 import com.example.nexus.ui.model.CreateReportRequest
 import com.example.nexus.ui.model.CreateUserRequest
 import com.example.nexus.ui.model.Like
+import com.example.nexus.ui.model.MarkNotificationsReadDTO
 import com.example.nexus.ui.model.NotificationResponse
 import com.example.nexus.ui.model.PatchUserDTO
 import com.example.nexus.ui.model.Post
@@ -165,6 +166,8 @@ interface ApiService {
         @Query("targetId") targetId: Long
     ): ApiResponse<Long>
 
+    @GET("yapping/api/notifications/count-unread")
+    suspend fun countUnreadNotifications(): ApiResponse<Long>
     @POST("yapping/api/comments")
     suspend fun createComment(
         @Body request: CreateCommentRequest
@@ -198,6 +201,10 @@ interface ApiService {
         @Path("userId") userId: Long
     ): ApiResponse<Any>
 
+    @PUT("yapping/api/notifications/mark-read")
+    suspend fun markNotificationAsRead(
+        @Body request: MarkNotificationsReadDTO
+    ): ApiResponse<Any>
     @POST("yapping/api/mentions/from-text")
     suspend fun createMention(
         @Body request: CreateMentionRequest
@@ -230,4 +237,6 @@ interface ApiService {
     suspend fun createReport(
         @Body request: CreateReportRequest
     ): ApiResponse<Any>
+
+
 }

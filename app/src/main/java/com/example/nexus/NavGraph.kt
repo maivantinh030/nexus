@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -84,6 +86,7 @@ fun AppNavGraph(viewModel: TimelineViewModel? = null) {
         SearchViewModel(timelineViewModel = timelineViewModel)
     }
 
+    val unreadCount = timelineViewModel?.unread_count?.value ?: 0
     // Các mục trong bottom navigation
     val bottomNavItems = listOf(
         BottomNavItem("timeline", "Trang chủ", Icons.Filled .Home),
@@ -112,8 +115,28 @@ fun AppNavGraph(viewModel: TimelineViewModel? = null) {
                         contentColor = Color.White // Màu cho nội dung
                     ) {
                         bottomNavItems.forEach { item ->
+
+                            val hasBadge = item.route == "activity"
+                            val badgeCount = unreadCount // ví dụ có 5 thông báo
+
+
                             NavigationBarItem(
-                                icon = { Icon(item.icon, contentDescription = item.title) },
+                                icon = {
+                                    if(hasBadge){
+                                        BadgedBox(
+                                            badge = {
+                                                if (badgeCount > 0) {
+                                                    Badge {
+                                                        Text(badgeCount.toString())
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(item.icon, contentDescription = item.title)
+                                        }
+                                    }
+                                    else
+                                        Icon(item.icon, contentDescription = item.title) },
                                 label = { Text(item.title) },
                                 selected = currentRoute == item.route,
                                 onClick = {
@@ -194,13 +217,11 @@ fun AppNavGraph(viewModel: TimelineViewModel? = null) {
             }
             composable("activity") {
                 timelineViewModel?.let { vm ->
-                    activityViewModel?.let { actVm ->
-                        ActivityScreen(
-                            activityViewModel = actVm,
-                            timelineViewModel = vm,
-                            navController = navController
-                        )
-                    }
+                    ActivityScreen(
+                        activityViewModel = activityViewModel,
+                        timelineViewModel = vm,
+                        navController = navController
+                    )
                 }
             }
             composable("profile") {

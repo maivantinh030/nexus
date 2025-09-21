@@ -7,7 +7,9 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +59,9 @@ fun ActivityScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+
+    var notiType by remember { mutableStateOf("ALL") }
+    val itemList = listOf("Tất cả", "Bài viết", "Bình luận", "Thích", "Theo dõi","Hệ thống")
 
     // Hiển thị lỗi qua Snackbar
     LaunchedEffect(notificationState.error) {
@@ -100,8 +106,11 @@ fun ActivityScreen(
     Box(modifier = Modifier
         .fillMaxSize()
         .background(
-            brush = Brush.linearGradient(
-                colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFF8FBFF), // sáng hơn
+                    Color(0xFFE3F0FF)
+                )
             )
         )){
         Column(
@@ -116,7 +125,40 @@ fun ActivityScreen(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
+            LazyRow(
+                modifier = Modifier .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp)
+            ){
+                items(itemList){item ->
 
+                    Button(
+                        onClick ={ notiType =
+                            when{
+                            item == "Tất cả" -> "ALL"
+                            item == "Hệ thống" -> "SYSTEM"
+                            item == "Bài viết" -> "NEW_POST"
+                            item == "Bình luận" -> "COMMENT"
+                            item == "Thích" -> "LIKE_POST"
+                            item == "Theo dõi" -> "FOLLOW"
+                            else -> "ALL"
+                            }
+
+                        },
+                        modifier = Modifier
+                            .height(36.dp)
+                            .shadow(elevation = 6.dp,shape = RoundedCornerShape(16.dp))
+                        ,
+                        colors = ButtonDefaults.buttonColors(
+                            contentColor = Color.Black,
+                            containerColor = Color.White
+                        )
+                    ){
+                        Text(text = item)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             when {
                 notificationState.loading && notificationState.notifications.isEmpty() -> {
                     CircularProgressIndicator(
@@ -145,7 +187,12 @@ fun ActivityScreen(
                 }
                 else -> {
                     LazyColumn(state = listState) {
-                        items(notificationState.notifications) { notification ->
+                        val notificationByType = if (notiType == "ALL") {
+                            notificationState.notifications
+                        } else {
+                            notificationState.notifications.filter { it.type == notiType }
+                        }
+                        items(notificationByType) { notification ->
                             NotificationCard(
                                 notification = notification,
                                 timelineViewModel = timelineViewModel,
@@ -280,7 +327,8 @@ fun NotificationCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                activityViewModel.markAsRead(notification.id) // Đổi từ notificationId thành id
+                activityViewModel.markAsRead(notification.id)
+                timelineViewModel.getUnReadNotificationCount()
                 when (notification.type) {
                     "LIKE_POST", "COMMENT","NEW_POST" -> {
                         if (notification.targetId != null) {
@@ -297,13 +345,13 @@ fun NotificationCard(
                 }
             },
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (!notification.isRead) 4.dp else 1.dp
+            defaultElevation =  4.dp
         ),
         colors = CardDefaults.cardColors(
             containerColor = if (!notification.isRead)
                 MaterialTheme.colorScheme.surface
             else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                Color(0xFFF5F7FA)
         )
     ) {
         Row(

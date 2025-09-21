@@ -82,7 +82,7 @@ fun TimelineScreen(
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
     val lazyListState = rememberLazyListState()
 
-    // cuộn vô hạn khi còn 5 item sẽ tự động tải thêm từ server
+
     LaunchedEffect(lazyListState) {
         snapshotFlow { lazyListState.firstVisibleItemIndex }.collect { firstIndex ->
             val totalItems = posts.size
@@ -114,8 +114,11 @@ fun TimelineScreen(
     Box(
         modifier = Modifier.fillMaxSize()
             .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFFB8D4E3), Color(0xFFE8F4F8))
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFF8FBFF), // sáng hơn
+                        Color(0xFFE3F0FF)
+                    )
                 )
             )
     ) {
@@ -169,7 +172,7 @@ fun TimelineScreen(
                         }
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_message),
+                            painter = painterResource(id = R.drawable.message),
                             contentDescription = "Messages",
                             modifier = Modifier.size(24.dp)
                         )

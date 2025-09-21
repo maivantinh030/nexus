@@ -196,10 +196,10 @@ fun PostItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 8.dp,
-            pressedElevation = 12.dp
+            defaultElevation = 12.dp,
+            pressedElevation = 16.dp
         ),
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFFF5F7FA)
@@ -556,7 +556,6 @@ fun PostItem(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-
             // Main Post Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -606,6 +605,17 @@ fun PostItem(
                     Icon(
                         painter = painterResource(id = R.drawable.ic_share),
                         contentDescription = "Share",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                IconButton(
+                    onClick={
+
+                    }
+                ){
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_bookmark),
+                        contentDescription = "Save",
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -900,7 +910,6 @@ fun ZoomableImage(
 
     val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
         val newScale = (scale * zoomChange).coerceIn(1f, 5f)
-
         // Chỉ cho phép di chuyển khi đã zoom
         if (newScale > 1f) {
             // Tính toán giới hạn di chuyển dựa trên mức zoom
@@ -914,7 +923,6 @@ fun ZoomableImage(
             offsetX = 0f
             offsetY = 0f
         }
-
         scale = newScale
     }
 

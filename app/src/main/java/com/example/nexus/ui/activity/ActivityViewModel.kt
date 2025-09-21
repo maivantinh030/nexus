@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.nexus.network.ApiService
 import com.example.nexus.network.RetrofitClient
 import com.example.nexus.ui.model.CreateNotificationRequest
+import com.example.nexus.ui.model.MarkNotificationsReadDTO
 import com.example.nexus.ui.model.Notification
 import com.example.nexus.ui.model.Post
 import com.example.nexus.ui.model.User
@@ -234,15 +235,15 @@ class ActivityViewModel(
     }
 
     fun markAsRead(notificationId: Long) {
-        _notificationState.value = _notificationState.value.copy(
-            notifications = _notificationState.value.notifications.map { notification ->
-                if (notification.id == notificationId) {  // Đổi từ notificationId thành id
-                    notification.copy(isRead = true)
-                } else {
-                    notification
-                }
+        viewModelScope.launch {
+            try{
+                val response = RetrofitClient.apiService.markNotificationAsRead(
+                    MarkNotificationsReadDTO(listOf(notificationId)))
             }
-        )
+            catch (e: Exception) {
+                Log.e("ActivityViewModel", "Error marking notification as read: ${e.message}", e)
+            }
+        }
     }
 
     // Cập nhật addNotification method để match với model mới
